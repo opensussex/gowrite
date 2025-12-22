@@ -49,6 +49,7 @@ go build -o gowrite main.go
 | **Ctrl + E** | **Open Command Palette** (Type commands here) |
 | **Ctrl + N** | Toggle **Scene Notes** View |
 | **Ctrl + T** | Toggle **Center Column** View (Margins) |
+| **Ctrl + F** | Toggle **Focus Mode** (Hide UI) |
 | **Ctrl + S** | Quick Save |
 | **F1** | Help Menu |
 | **Esc** | Exit current view (Analysis/Help) back to Editor |

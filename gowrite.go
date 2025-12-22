@@ -57,9 +57,10 @@ func main() {
 	)
 	currentView := ViewMain
 
-	// Centered View State
+	// Visual States
 	isCenteredView := false
-	const TargetWidth = 85 // The ideal reading width in characters
+	isFocusMode := false // Hides all UI chrome (formerly Zen Mode)
+	const TargetWidth = 85
 
 	dictionary := make(map[string]bool)
 	dictionaryLoaded := false
@@ -101,7 +102,7 @@ func main() {
 
 	commandPalette.SetBorder(true).SetBorderPadding(0, 0, 1, 1).SetTitle("Command Palette")
 
-	defaultHelpText := " F1: Help | Ctrl-N: Notes | Ctrl-T: Center | Ctrl-S: Save | Ctrl-E: Command"
+	defaultHelpText := " F1: Help | Ctrl-N: Notes | Ctrl-T: Center | Ctrl-F: Focus Mode | Ctrl-E: Command"
 	helpInfo := tview.NewTextView().
 		SetText(defaultHelpText).
 		SetTextColor(tcell.ColorDarkGray)
@@ -239,31 +240,60 @@ func main() {
 		saveCurrentChapter()
 		currentView = viewType
 
-		// Clear grid
-		mainView.RemoveItem(textArea)
-		mainView.RemoveItem(notesArea)
-		mainView.RemoveItem(analysisView)
+		// 1. Clear grid completely
+		mainView.Clear()
+
+		// 2. Determine which widget to show
+		var activeWidget tview.Primitive
+		var title string
+		chapter := chapters[currentChapterIndex]
 
 		switch viewType {
 		case ViewMain:
-			mainView.AddItem(textArea, 0, 0, 1, 2, 0, 0, true)
-			app.SetFocus(textArea)
+			activeWidget = textArea
+			title = fmt.Sprintf("gowrite - Chapter %d: %s", currentChapterIndex+1, chapter.Title)
 			helpInfo.SetText(defaultHelpText)
-			chapter := chapters[currentChapterIndex]
-			textArea.SetTitle(fmt.Sprintf("gowrite - Chapter %d: %s", currentChapterIndex+1, chapter.Title))
-
 		case ViewNotes:
-			mainView.AddItem(notesArea, 0, 0, 1, 2, 0, 0, true)
-			app.SetFocus(notesArea)
-			helpInfo.SetText(" EDITING NOTES | Ctrl-N: Back | Ctrl-T: Center | Ctrl-E: Command")
-			chapter := chapters[currentChapterIndex]
-			textArea.SetTitle(fmt.Sprintf("gowrite - Chapter %d: %s (NOTES)", currentChapterIndex+1, chapter.Title))
-
+			activeWidget = notesArea
+			title = fmt.Sprintf("gowrite - Chapter %d: %s (NOTES)", currentChapterIndex+1, chapter.Title)
+			helpInfo.SetText(" EDITING NOTES | Ctrl-N: Back | Ctrl-T: Center | Ctrl-F: Focus Mode")
 		case ViewAnalyze:
-			mainView.AddItem(analysisView, 0, 0, 1, 2, 0, 0, true)
-			app.SetFocus(analysisView)
+			activeWidget = analysisView
+			title = "HEMINGWAY ANALYSIS MODE"
 			helpInfo.SetText(" ANALYSIS | [Blue]Adverbs [Green]Passive [Yellow]Hard [Red]Very Hard | Esc: Exit")
 		}
+
+		// 3. Apply Focus Mode Logic (Grid Layout & Borders)
+		if isFocusMode {
+			// FOCUS: Single row, no borders, full height
+			mainView.SetRows(0)
+			mainView.AddItem(activeWidget, 0, 0, 1, 2, 0, 0, true)
+
+			// We cast to Box to disable border if it's a Box-based widget
+			if v, ok := activeWidget.(*tview.TextArea); ok {
+				v.SetBorder(false)
+			}
+			if v, ok := activeWidget.(*tview.TextView); ok {
+				v.SetBorder(false)
+			}
+		} else {
+			// NORMAL: 3 Rows, Borders on
+			mainView.SetRows(0, 3, 1)
+			mainView.AddItem(activeWidget, 0, 0, 1, 2, 0, 0, true)
+			mainView.AddItem(commandPalette, 1, 0, 1, 2, 0, 0, false)
+			mainView.AddItem(helpInfo, 2, 0, 1, 1, 0, 0, false)
+			mainView.AddItem(position, 2, 1, 1, 1, 0, 0, false)
+
+			if v, ok := activeWidget.(*tview.TextArea); ok {
+				v.SetBorder(true).SetTitle(title)
+			}
+			if v, ok := activeWidget.(*tview.TextView); ok {
+				v.SetBorder(true).SetTitle(title)
+			}
+		}
+
+		// 4. Focus
+		app.SetFocus(activeWidget)
 	}
 
 	toggleNotes := func() {
@@ -272,6 +302,11 @@ func main() {
 		} else {
 			setView(ViewNotes)
 		}
+	}
+
+	toggleFocus := func() {
+		isFocusMode = !isFocusMode
+		setView(currentView) // Refreshes layout
 	}
 
 	showModal := func(title, text string) {
@@ -310,7 +345,7 @@ func main() {
 		modal.SetButtonBackgroundColor(tview.Styles.TitleColor)
 		modal.SetButtonTextColor(tview.Styles.PrimitiveBackgroundColor)
 		pages.AddPage("modal", modal, true, true)
-		app.SetFocus(modal)
+		app.SetFocus(modal) // Explicit Focus
 	}
 
 	showYesNoModal := func(title, text string, onYes func()) {
@@ -334,7 +369,7 @@ func main() {
 		modal.SetButtonBackgroundColor(tview.Styles.TitleColor)
 		modal.SetButtonTextColor(tview.Styles.PrimitiveBackgroundColor)
 		pages.AddPage("modal", modal, true, true)
-		app.SetFocus(modal)
+		app.SetFocus(modal) // Explicit Focus
 	}
 
 	flashStatusMessage := func(msg string) {
@@ -632,18 +667,22 @@ func main() {
 		currentFilename = filename
 		currentChapterIndex = 0
 		currentView = ViewMain
+		isFocusMode = false // Reset Focus mode on load
 
 		// Manually Update Interface (No Save Trigger)
-		mainView.RemoveItem(textArea)
-		mainView.RemoveItem(notesArea)
-		mainView.RemoveItem(analysisView)
+		mainView.Clear()
+		mainView.SetRows(0, 3, 1)
 		mainView.AddItem(textArea, 0, 0, 1, 2, 0, 0, true)
+		mainView.AddItem(commandPalette, 1, 0, 1, 2, 0, 0, false)
+		mainView.AddItem(helpInfo, 2, 0, 1, 1, 0, 0, false)
+		mainView.AddItem(position, 2, 1, 1, 1, 0, 0, false)
 
 		c := chapters[0]
 		textArea.SetText(c.Content, false)
 		notesArea.SetText(c.Notes, false)
 		textArea.SetTitle(fmt.Sprintf("gowrite - Chapter 1: %s", c.Title))
 		notesArea.SetTitle("NOTES - Chapter 1")
+		textArea.SetBorder(true)
 
 		app.SetFocus(textArea)
 		helpInfo.SetText(defaultHelpText)
@@ -706,7 +745,7 @@ func main() {
 		list := tview.NewList().ShowSecondaryText(false).SetHighlightFullLine(true)
 		list.SetSelectedBackgroundColor(tview.Styles.TitleColor).SetSelectedTextColor(tview.Styles.PrimitiveBackgroundColor)
 		list.SetBorder(true).SetTitle("Chapters (< & > reorder)")
-		list.SetBorderPadding(1, 1, 2, 2) // Added Padding as requested
+		list.SetBorderPadding(1, 1, 2, 2)
 
 		populateList := func() {
 			list.Clear()
@@ -971,6 +1010,7 @@ Type to enter text.
 [yellow]Ctrl-Q[white]: Copy | [yellow]Ctrl-X[white]: Cut | [yellow]Ctrl-V[white]: Paste
 [yellow]Ctrl-Z[white]: Undo | [yellow]Ctrl-Y[white]: Redo
 [yellow]Ctrl-T[white]: Toggle Center View
+[yellow]Ctrl-F[white]: Toggle Focus Mode
 [blue]Enter for next page, Esc to return.`)
 
 	helpCmds := tview.NewTextView().SetDynamicColors(true).SetText(`[green]Commands (Ctrl-E)
@@ -1047,7 +1087,16 @@ Type to enter text.
 			app.ForceDraw()
 			return nil
 		}
+		// FOCUS MODE TOGGLE (Ctrl-F)
+		if e.Key() == tcell.KeyCtrlF {
+			toggleFocus()
+			return nil
+		}
 		if e.Key() == tcell.KeyCtrlE {
+			// Auto-exit Focus Mode if user wants to run a command
+			if isFocusMode {
+				toggleFocus()
+			}
 			if app.GetFocus() != commandPalette {
 				app.SetFocus(commandPalette)
 			} else {
