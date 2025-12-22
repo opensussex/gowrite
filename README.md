@@ -1,0 +1,108 @@
+# gowrite
+
+**gowrite** is a distraction-free, terminal-based manuscript editor written in Go.
+
+It combines the minimalism of a text editor (like Vim/Nano) with the project-management features of writing software (like Scrivener/Hemingway), allowing authors to draft novels, organize chapters, and analyze their prose without ever touching a mouse.
+
+## ✨ Key Features
+
+* **Focused Drafting**: A clean, terminal-based interface designed for flow.
+* **Dual-Pane Workflow**: Toggle instantly between your **Manuscript** and **Scene Notes** (`Ctrl-N`).
+* **Hemingway Analysis**: A built-in style checker that highlights adverbs, passive voice, and overly complex sentences.
+* **Zen & Comfort**:
+    * **Center View (`Ctrl-T`)**: Toggles margins to reduce eye strain on wide monitors.
+    * **Theming**: Switch between `dark`, `light`, or `retro` (green-screen) modes.
+* **Project Management**: Reorder chapters, track word count targets, and auto-save safely to JSON.
+
+## 🚀 Installation
+
+### Prerequisites
+* [Go](https://go.dev/dl/) (version 1.18 or higher recommended).
+
+### Setup
+1.  Clone this repository.
+2.  Initialize and install dependencies:
+    ```bash
+    go mod init gowrite
+    go get [github.com/gdamore/tcell/v2](https://github.com/gdamore/tcell/v2)
+    go get [github.com/rivo/tview](https://github.com/rivo/tview)
+    ```
+3.  **Dictionary Setup (Required for Spellcheck)**:
+    You must place a file named `dictionary.txt` in the root folder.
+    * *Download:* [dwyl/english-words (words_alpha.txt)](https://github.com/dwyl/english-words/blob/master/words_alpha.txt)
+    * *Rename it* to `dictionary.txt`.
+
+### Running the App
+```bash
+go run main.go
+```
+*Or build for portability:*
+```bash
+go build -o gowrite main.go
+./gowrite
+```
+
+## ⌨️ Shortcuts & Controls
+
+| Global Key | Action |
+| :--- | :--- |
+| **Ctrl + E** | **Open Command Palette** (Type commands here) |
+| **Ctrl + N** | Toggle **Scene Notes** View |
+| **Ctrl + T** | Toggle **Center Column** View (Margins) |
+| **Ctrl + S** | Quick Save |
+| **F1** | Help Menu |
+| **Esc** | Exit current view (Analysis/Help) back to Editor |
+
+### Text Editing
+Standard readline shortcuts apply:
+* **Ctrl+Q / Ctrl+V**: Copy / Paste
+* **Ctrl+Z / Ctrl+Y**: Undo / Redo
+* **Arrows**: Navigation
+
+## 🛠 Command Palette Guide
+Press `Ctrl+E` to focus the command bar at the bottom.
+
+### 1. File & Project
+* `save [name]` — Save project to JSON (e.g., `save mybook`).
+* `open [name]` — Load a project.
+* `export [name]` — Export the full manuscript to a `.txt` file (excludes notes).
+
+### 2. Chapters
+* `chapter new [Title]` — Create a new chapter.
+* `chapter rename [N] [Name]` — Rename chapter number `N`.
+* `chapter delete [N]` — Delete chapter number `N`.
+* `chapters` — Open the **Chapter Manager**.
+    * *Inside Manager:* Use `<` and `>` to reorder chapters.
+
+### 3. Writing Tools
+* `target [N]` — Set a word count goal for the current chapter.
+* `wordcount` — Show stats (Words, Chars, Lines).
+* `spellcheck` — Scan for words not in your `dictionary.txt`.
+* `analyze` — **Hemingway Mode**. Switches to a read-only view that highlights:
+    * **[Blue]**: Adverbs (weak verbs).
+    * **[Green]**: Passive voice.
+    * **[Yellow]**: Hard sentences (>14 words).
+    * **[Red]**: Very hard sentences (>20 words).
+
+### 4. Customization
+* `theme [name]` — Change color scheme.
+    * Options: `dark` (Default), `light`, `retro`.
+* `search [term]` / `replace [old] [new]` — Standard find/replace.
+
+## 📂 Data Structure
+Your project saves as a single `.json` file containing the manuscript and the meta-data (notes, targets).
+
+**Example `mybook.json`:**
+```json
+[
+  {
+    "Title": "Chapter 1: The Call",
+    "Content": "The phone rang at midnight...",
+    "Notes": "Remember to foreshadow the villain here.",
+    "Target": 1500
+  }
+]
+```
+
+## License
+This project is licensed under the GNU General Public License v3.0 (GPLv3).
