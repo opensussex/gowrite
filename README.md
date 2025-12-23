@@ -13,6 +13,7 @@ It combines the minimalism of a text editor (like Vim/Nano) with the project-man
     * **Center View (`Ctrl-T`)**: Toggles margins to reduce eye strain on wide monitors.
     * **Theming**: Switch between `dark`, `light`, or `retro` (green-screen) modes.
 * **Story Wiki**: A dedicated global notebook for tracking characters, locations, and lore (`Ctrl+W`).
+* **Structure Template**: Beat "blank page syndrome" by generating outline based on classic storytelling arcs (Hero's Journey, Save the Cat, Horror etc.) - 5 to pick from.
 * **Project Management**: Reorder chapters, track word count targets, and auto-save safely to JSON.
 
 ## 🚀 Installation
@@ -82,8 +83,16 @@ Press `Ctrl+E` to focus the command bar at the bottom.
     * **[Green]**: Passive voice.
     * **[Yellow]**: Hard sentences (>14 words).
     * **[Red]**: Very hard sentences (>20 words).
+    
+### 5. Structuring & Plotting
+* `structure [type]` — WARNING: Replaces all current chapters with a template structure.
+    * 3act - Standard Three-Act structure
+    * hero - The Hero's Journey (Monomyth)
+    * cat - Save the Cat (Screenwriting/Pacing beat sheet)
+    * fichtean - Fichtean Curve (Series of crises, great for thrillers)
+    * horror - 7-beat Horror/Survival arc.
 
-### 5. Customization
+### 6. Customization
 * `theme [name]` — Change color scheme.
     * Options: `dark` (Default), `light`, `retro`.
 * `search [term]` / `replace [old] [new]` — Standard find/replace.
