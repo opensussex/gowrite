@@ -45,6 +45,7 @@ go build -o gowrite main.go
 | **Ctrl + W** | Toggle **Story Wiki** View |
 | **Ctrl + T** | Toggle **Center Column** View (Margins) |
 | **Ctrl + F** | Toggle **Focus Mode** (Hide UI) |
+| **Ctrl + G** | Opens Chapter Modal |
 | **Ctrl + S** | Quick Save |
 | **F1** | Help Menu |
 | **Esc** | Exit current view (Analysis/Help) back to Editor |

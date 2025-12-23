@@ -140,7 +140,7 @@ func main() {
 	commandPalette.SetBorderPadding(0, 0, 1, 1)
 	commandPalette.SetTitle("Command Palette")
 
-	defaultHelpText := " F1: Help | Ctrl-N: Notes | Ctrl-W: Wiki | Ctrl-T: Center | Ctrl-E: Command"
+	defaultHelpText := " F1: Help | Ctrl-G: Chapters | Ctrl-N: Notes | Ctrl-W: Wiki | Ctrl-E: Command"
 	helpInfo := tview.NewTextView()
 	helpInfo.SetText(defaultHelpText)
 	helpInfo.SetTextColor(tcell.ColorDarkGray)
@@ -357,6 +357,7 @@ func main() {
 			mainView.SetColumns(0) // Reset to single column
 
 		case ViewWiki:
+			// WIKI LAYOUT: List on left, Text on right
 			activeWidget = wikiList
 			title = "Story Bible"
 			helpInfo.SetText(" WIKI | Enter: Select | Tab: Edit Text | Ctrl-W: Close | 'wiki new/del' to manage")
@@ -384,12 +385,15 @@ func main() {
 			}
 
 			app.SetFocus(wikiList)
-			return
+			return // Exit function early, we handled the layout manually
 		}
 
+		// 3. Apply Layout for Standard Views (Main, Notes, Analyze)
 		if isFocusMode {
+			// FOCUS: Single row, no borders, full height
 			mainView.SetRows(0)
 			mainView.AddItem(activeWidget, 0, 0, 1, 2, 0, 0, true)
+
 			if v, ok := activeWidget.(*tview.TextArea); ok {
 				v.SetBorder(false)
 			}
@@ -397,6 +401,7 @@ func main() {
 				v.SetBorder(false)
 			}
 		} else {
+			// NORMAL: 3 Rows, Borders on
 			mainView.SetRows(0, 3, 1)
 			mainView.AddItem(activeWidget, 0, 0, 1, 2, 0, 0, true)
 			mainView.AddItem(commandPalette, 1, 0, 1, 2, 0, 0, false)
@@ -411,6 +416,7 @@ func main() {
 			}
 		}
 
+		// 4. Focus
 		app.SetFocus(activeWidget)
 	}
 
@@ -441,6 +447,7 @@ func main() {
 		modal.AddButtons([]string{"OK"})
 		modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			pages.HidePage("modal")
+			// Restore focus
 			if currentView == ViewNotes {
 				app.SetFocus(notesArea)
 			} else if currentView == ViewAnalyze {
@@ -1318,6 +1325,10 @@ Type to enter text.
 		// WIKI TOGGLE (Ctrl-W)
 		if e.Key() == tcell.KeyCtrlW {
 			toggleWiki()
+			return nil
+		}
+		if e.Key() == tcell.KeyCtrlG {
+			handleCommand("chapters")
 			return nil
 		}
 		if e.Key() == tcell.KeyCtrlE {
