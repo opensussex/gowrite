@@ -1,5 +1,7 @@
 # gowrite
 
+![gowrite screenshot](screenshot.png)
+
 **gowrite** is a distraction-free, terminal-based manuscript editor written in Go.
 
 It combines the minimalism of a text editor (like Vim/Nano) with the project-management features of writing software (like Scrivener/Hemingway), allowing authors to draft novels, organize chapters, and analyze their prose without ever touching a mouse.
