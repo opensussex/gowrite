@@ -308,7 +308,6 @@ func main() {
 		wikiArea.SetText(entry.Content, false)
 		wikiArea.SetTitle(fmt.Sprintf("Wiki: %s", entry.Title))
 
-		// Populate List
 		wikiList.Clear()
 		for i, w := range wikiEntries {
 			title := w.Title
@@ -316,7 +315,6 @@ func main() {
 				title += " *"
 			}
 			idx := i
-			// Note: The callback here handles both Loading AND Focusing
 			wikiList.AddItem(title, "", 0, func() {
 				loadWiki(idx)
 				app.SetFocus(wikiArea)
@@ -326,7 +324,6 @@ func main() {
 	}
 
 	setView := func(viewType int) {
-		// Save state before switching
 		if currentView == ViewWiki {
 			saveCurrentWiki()
 		} else {
@@ -334,11 +331,8 @@ func main() {
 		}
 
 		currentView = viewType
-
-		// 1. Clear grid completely
 		mainView.Clear()
 
-		// 2. Determine which widget to show
 		var activeWidget tview.Primitive
 		var title string
 		chapter := chapters[currentChapterIndex]
@@ -363,14 +357,12 @@ func main() {
 			mainView.SetColumns(0) // Reset to single column
 
 		case ViewWiki:
-			// WIKI LAYOUT: List on left, Text on right
 			activeWidget = wikiList
 			title = "Story Bible"
 			helpInfo.SetText(" WIKI | Enter: Select | Tab: Edit Text | Ctrl-W: Close | 'wiki new/del' to manage")
 
 			loadWiki(currentWikiIndex)
 
-			// Setup split screen
 			mainView.SetColumns(30, 0)
 			mainView.SetRows(0, 3, 1)
 
@@ -380,7 +372,6 @@ func main() {
 			mainView.AddItem(helpInfo, 2, 0, 1, 1, 0, 0, false)
 			mainView.AddItem(position, 2, 1, 1, 1, 0, 0, false)
 
-			// Wiki-specific Focus Mode
 			if isFocusMode {
 				mainView.SetRows(0)
 				mainView.AddItem(wikiList, 0, 0, 1, 1, 0, 0, true)
@@ -393,15 +384,12 @@ func main() {
 			}
 
 			app.SetFocus(wikiList)
-			return // Exit function early, we handled the layout manually
+			return
 		}
 
-		// 3. Apply Layout for Standard Views (Main, Notes, Analyze)
 		if isFocusMode {
-			// FOCUS: Single row, no borders, full height
 			mainView.SetRows(0)
 			mainView.AddItem(activeWidget, 0, 0, 1, 2, 0, 0, true)
-
 			if v, ok := activeWidget.(*tview.TextArea); ok {
 				v.SetBorder(false)
 			}
@@ -409,7 +397,6 @@ func main() {
 				v.SetBorder(false)
 			}
 		} else {
-			// NORMAL: 3 Rows, Borders on
 			mainView.SetRows(0, 3, 1)
 			mainView.AddItem(activeWidget, 0, 0, 1, 2, 0, 0, true)
 			mainView.AddItem(commandPalette, 1, 0, 1, 2, 0, 0, false)
@@ -424,7 +411,6 @@ func main() {
 			}
 		}
 
-		// 4. Focus
 		app.SetFocus(activeWidget)
 	}
 
@@ -446,7 +432,7 @@ func main() {
 
 	toggleFocus := func() {
 		isFocusMode = !isFocusMode
-		setView(currentView) // Refreshes layout
+		setView(currentView)
 	}
 
 	showModal := func(title, text string) {
@@ -455,7 +441,6 @@ func main() {
 		modal.AddButtons([]string{"OK"})
 		modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			pages.HidePage("modal")
-			// Restore focus
 			if currentView == ViewNotes {
 				app.SetFocus(notesArea)
 			} else if currentView == ViewAnalyze {
@@ -558,6 +543,92 @@ func main() {
 		} else {
 			showModal("Success", fmt.Sprintf("Renamed Chapter %d to '%s'", index+1, newName))
 		}
+	}
+
+	// --- STRUCTURE TEMPLATES ---
+	applyStructure := func(name string) {
+		var newChapters []Chapter
+		name = strings.ToLower(name)
+
+		switch name {
+		case "3act", "standard":
+			newChapters = []Chapter{
+				{Title: "Act 1: The Setup", Notes: "Introduce characters and the ordinary world.\nEstablish the status quo and the flaw that holds them back.", Content: ">> GUIDANCE: Introduce the protagonist in their 'Ordinary World'. Establish the status quo and the flaw that holds them back."},
+				{Title: "Inciting Incident", Notes: "Something happens that disrupts the status quo.\nThe hero faces a problem they cannot ignore.", Content: ">> GUIDANCE: An external event disrupts the status quo. The hero faces a problem they cannot ignore."},
+				{Title: "Plot Point 1", Notes: "The hero leaves the ordinary world.\nThe hero decides to engage with the problem.", Content: ">> GUIDANCE: The hero decides to engage with the problem. They leave their comfort zone and cross into the 'Special World'."},
+				{Title: "Act 2: The Confrontation", Notes: "Rising action, tests, allies, and enemies.", Content: ">> GUIDANCE: Rising action. The hero meets allies and enemies. They face tests that force them to learn new skills."},
+				{Title: "Midpoint", Notes: "A major event shifts the context (false victory/defeat).\nThe stakes are raised; there is no turning back.", Content: ">> GUIDANCE: A major event shifts the context (a false victory or defeat). The stakes are raised; there is no turning back."},
+				{Title: "Plot Point 2", Notes: "All hope seems lost (The Dark Night of the Soul).\nThe hero must find a new solution or inner strength.", Content: ">> GUIDANCE: All hope seems lost. The hero must find a new solution or inner strength."},
+				{Title: "Act 3: The Resolution", Notes: "The final battle/climax.\nThe hero faces the antagonist one last time.", Content: ">> GUIDANCE: The Climax. The hero faces the antagonist one last time. They must use the lessons learned in Act 2 to win."},
+				{Title: "The End", Notes: "The aftermath. Establish the 'New Normal'.\nShow how the hero has changed.", Content: ">> GUIDANCE: The aftermath. Establish the 'New Normal'. Show how the hero has changed."},
+			}
+		case "hero", "monomyth":
+			newChapters = []Chapter{
+				{Title: "The Ordinary World", Notes: "Status Quo.", Content: ">> GUIDANCE: Show the hero's life before the journey. Highlight their dissatisfaction or lack of completeness."},
+				{Title: "Call to Adventure", Notes: "Disruption.", Content: ">> GUIDANCE: Something shakes up the situation. The hero is presented with a challenge or opportunity."},
+				{Title: "Refusal of the Call", Notes: "Fear or hesitation.", Content: ">> GUIDANCE: The hero hesitates due to fear or insecurity. Why are they afraid to leave?"},
+				{Title: "Meeting the Mentor", Notes: "Gaining tools/advice.", Content: ">> GUIDANCE: The hero gains supplies, advice, or confidence from a mentor. They are now ready to face the journey."},
+				{Title: "Crossing the Threshold", Notes: "Leaving the known world.", Content: ">> GUIDANCE: The hero commits to leaving the Ordinary World. They enter the Special World with different rules."},
+				{Title: "Tests, Allies, Enemies", Notes: "Learning the rules.", Content: ">> GUIDANCE: The hero explores the new world. They make friends and attract enemies."},
+				{Title: "Approach to the Cave", Notes: "Preparing for the main danger.", Content: ">> GUIDANCE: The hero prepares for the major challenge. Plans are made, and the team is gathered."},
+				{Title: "The Ordeal", Notes: "Death and rebirth moment.", Content: ">> GUIDANCE: The central crisis (midpoint). A brush with death. The hero confronts their greatest fear."},
+				{Title: "The Reward", Notes: "Seizing the sword.", Content: ">> GUIDANCE: The hero seizes the object of their quest (sword, elixir, knowledge). But the danger is not over yet."},
+				{Title: "The Road Back", Notes: "The chase scene/urgency.", Content: ">> GUIDANCE: The hero is pursued by the vengeful forces. The urgency ramps up for the final escape."},
+				{Title: "Resurrection", Notes: "Final test.", Content: ">> GUIDANCE: The final test. The hero is purified by a last sacrifice. They must prove they have truly learned the lesson."},
+				{Title: "Return with Elixir", Notes: "Master of two worlds.", Content: ">> GUIDANCE: The hero returns home, transformed. They bring back something that heals the Ordinary World."},
+			}
+		case "cat", "save the cat":
+			newChapters = []Chapter{
+				{Title: "Opening Image", Notes: "Snapshot of life before.", Content: ">> GUIDANCE: A visual snapshot of the status quo. Set the tone and mood."},
+				{Title: "Theme Stated", Notes: "What the story is really about.", Content: ">> GUIDANCE: Someone (usually not the hero) states the theme of the story. The hero doesn't understand it yet."},
+				{Title: "Setup", Notes: "Expanding on the hero's flaws.", Content: ">> GUIDANCE: Expand on the hero's life and flaws. Show why they need to change (Stasis = Death)."},
+				{Title: "Catalyst", Notes: "Life changes forever.", Content: ">> GUIDANCE: The Inciting Incident. Life changes forever; they can't go back."},
+				{Title: "Debate", Notes: "Can I do this?", Content: ">> GUIDANCE: The hero reacts to the catalyst. They question what to do (Refusal of the Call)."},
+				{Title: "Break into Two", Notes: "Choosing the journey.", Content: ">> GUIDANCE: The hero makes a proactive choice to enter the new world. Act 2 begins."},
+				{Title: "B Story", Notes: "Love interest or subplot.", Content: ">> GUIDANCE: Introduce the love interest or subplot character. This relationship discusses the theme."},
+				{Title: "Fun and Games", Notes: "The 'trailer' moments.", Content: ">> GUIDANCE: The 'Promise of the Premise'. Show scenes that audiences came to see."},
+				{Title: "Midpoint", Notes: "Stakes raise significantly.", Content: ">> GUIDANCE: Stakes raise significantly (False Victory or False Defeat). The 'clock' starts ticking."},
+				{Title: "Bad Guys Close In", Notes: "Pressure mounts.", Content: ">> GUIDANCE: Internal and external pressure mounts. The hero's plan starts to fail."},
+				{Title: "All Is Lost", Notes: "Whiff of death.", Content: ">> GUIDANCE: The lowest point. Something dies (literally or metaphorically). The hero loses hope."},
+				{Title: "Dark Night of the Soul", Notes: "Wallowing in hopelessness.", Content: ">> GUIDANCE: The hero wallows in their hopelessness. But in the darkness, they find the true solution."},
+				{Title: "Break into Three", Notes: "The new idea/solution.", Content: ">> GUIDANCE: The hero realizes the answer (fixing the flaw). They devise a new plan."},
+				{Title: "Finale", Notes: "Executing the plan.", Content: ">> GUIDANCE: The hero executes the plan and defeats the bad guys. The old world is destroyed/changed."},
+				{Title: "Final Image", Notes: "Mirror of opening image.", Content: ">> GUIDANCE: Mirror of the Opening Image. Show visually how much the hero has changed."},
+			}
+		case "fichtean":
+			newChapters = []Chapter{
+				{Title: "Inciting Incident", Notes: "Start immediately with the problem.", Content: ">> GUIDANCE: Skip the setup. Start immediately with the problem. Throw the reader into the action."},
+				{Title: "Crisis 1", Notes: "First obstacle. Rising action.", Content: ">> GUIDANCE: The first major obstacle. The hero tries to solve it but complications arise."},
+				{Title: "Crisis 2", Notes: "Higher stakes obstacle.", Content: ">> GUIDANCE: The stakes get higher. The problem expands or gets more personal."},
+				{Title: "Crisis 3", Notes: "Even higher stakes.", Content: ">> GUIDANCE: The situation seems dire. The hero's resources are running thin."},
+				{Title: "The Climax", Notes: "Maximum tension.", Content: ">> GUIDANCE: Maximum tension. The final confrontation. The hero succeeds or fails."},
+				{Title: "Falling Action", Notes: "Loose ends tied.", Content: ">> GUIDANCE: Loose ends are tied up. The immediate aftermath of the climax."},
+				{Title: "Resolution", Notes: "New normal.", Content: ">> GUIDANCE: The new normal is established. A brief moment of calm."},
+			}
+		case "horror":
+			newChapters = []Chapter{
+				{Title: "The Dreadful Normal", Notes: "Establish status quo with unease.", Content: ">> GUIDANCE: Establish the setting and characters. Create a subtle sense of unease or isolation despite the normalcy."},
+				{Title: "The Omen", Notes: "A warning sign.", Content: ">> GUIDANCE: A warning sign appears but is ignored or rationalized. The first subtle brush with the entity."},
+				{Title: "The Onset", Notes: "The threat reveals itself.", Content: ">> GUIDANCE: The threat reveals itself properly. The first scare or victim. There is no going back now."},
+				{Title: "The Discovery", Notes: "Realization of the horror.", Content: ">> GUIDANCE: The characters realize what they are dealing with. Escape attempts fail. Isolation is complete."},
+				{Title: "The Pursuit", Notes: "Cat and Mouse.", Content: ">> GUIDANCE: The entity attacks. High tension chase or siege. The characters are stripped of resources."},
+				{Title: "The Confrontation", Notes: "The final stand.", Content: ">> GUIDANCE: The final stand. The remaining survivors must face the horror head-on. High casualty rate."},
+				{Title: "The Aftermath", Notes: "Survival... or is it?", Content: ">> GUIDANCE: The evil is defeated... or is it? The survivors escape, but they are changed forever."},
+			}
+		default:
+			showModal("Error", "Unknown structure.\nTry: 3act, hero, cat, fichtean, horror")
+			return
+		}
+
+		showYesNoModal("Warning", fmt.Sprintf("This will ERASE all current chapters and apply '%s'. Continue?", name), func() {
+			chapters = newChapters
+			currentChapterIndex = 0
+			// FIX: Manually update UI to avoid 'loadChapter' saving old blank text over new template
+			textArea.SetText(chapters[0].Content, false)
+			notesArea.SetText(chapters[0].Notes, false)
+			textArea.SetTitle(fmt.Sprintf("gowrite - Chapter 1: %s", chapters[0].Title))
+			flashStatusMessage("Applied Structure: " + name)
+		})
 	}
 
 	// --- WIKI OPS ---
@@ -1010,6 +1081,13 @@ func main() {
 				setView(ViewWiki)
 			}
 
+		case "structure":
+			if len(parts) > 1 {
+				applyStructure(parts[1])
+			} else {
+				showModal("Structure", "Usage: structure <name>\nOptions: 3act, hero, cat, fichtean, horror")
+			}
+
 		case "chapter":
 			if len(parts) > 1 {
 				sub := strings.ToLower(parts[1])
@@ -1081,7 +1159,7 @@ func main() {
 
 			// Intelligent focus restoration
 			isModal := false
-			for _, m := range []string{"help", "chapters", "list", "wordcount", "save", "open", "load", "export", "search", "replace", "spell", "theme", "analyze", "target", "chapter", "wiki"} {
+			for _, m := range []string{"help", "chapters", "list", "wordcount", "save", "open", "load", "export", "search", "replace", "spell", "theme", "analyze", "target", "chapter", "wiki", "structure"} {
 				if strings.HasPrefix(cmd, m) {
 					isModal = true
 					break
@@ -1155,6 +1233,7 @@ Type to enter text.
 	helpCmds := tview.NewTextView()
 	helpCmds.SetDynamicColors(true)
 	helpCmds.SetText(`[green]Commands (Ctrl-E)
+[yellow]structure <type>[white]: Apply template (3act, hero, cat, fichtean, horror)
 [yellow]wiki[white]: Open Story Bible (Ctrl-W to close)
 [yellow]wiki new <name>[white]: Add entry
 [yellow]wiki rename <name>[white]: Rename entry
