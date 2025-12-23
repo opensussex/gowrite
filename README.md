@@ -21,17 +21,7 @@ It combines the minimalism of a text editor (like Vim/Nano) with the project-man
 * [Go](https://go.dev/dl/) (version 1.18 or higher recommended).
 
 ### Setup
-1.  Clone this repository.
-2.  Initialize and install dependencies:
-    ```bash
-    go mod init gowrite
-    go get [github.com/gdamore/tcell/v2](https://github.com/gdamore/tcell/v2)
-    go get [github.com/rivo/tview](https://github.com/rivo/tview)
-    ```
-3.  **Dictionary Setup (Required for Spellcheck)**:
-    You must place a file named `dictionary.txt` in the root folder.
-    * *Download:* [dwyl/english-words (words_alpha.txt)](https://github.com/dwyl/english-words/blob/master/words_alpha.txt)
-    * *Rename it* to `dictionary.txt`.
+Clone this repository.
 
 ### Running the App
 ```bash
