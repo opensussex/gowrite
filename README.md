@@ -28,11 +28,11 @@ Clone this repository.
 
 ### Running the App
 ```bash
-go run main.go
+go run gowrite.go
 ```
 *Or build for portability:*
 ```bash
-go build -o gowrite main.go
+go build gowrite.go
 ./gowrite
 ```
 
