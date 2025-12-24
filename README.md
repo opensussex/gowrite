@@ -61,7 +61,8 @@ Press `Ctrl+E` to focus the command bar at the bottom.
 
 ### 1. File & Project
 * `save [name]` — Save project to JSON (e.g., `save mybook`).
-* `open [name]` — Load a project.
+* `open` — Opens a file picker showing all `.json` files in the current directory. Use arrow keys to navigate and Enter to open.
+* `open [name]` — Load a specific project file directly.
 * `export [name]` — Export the full manuscript to a `.txt` file (excludes notes).
 
 ### 2. Chapters

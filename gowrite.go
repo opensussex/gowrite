@@ -996,6 +996,70 @@ func main() {
 		}
 	}()
 
+	// --- FILE PICKER ---
+	showFilePicker := func() {
+		// Get list of .json files in current directory
+		files, err := os.ReadDir(".")
+		if err != nil {
+			showModal("Error", "Could not read directory")
+			return
+		}
+
+		var jsonFiles []string
+		for _, file := range files {
+			if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
+				jsonFiles = append(jsonFiles, file.Name())
+			}
+		}
+
+		if len(jsonFiles) == 0 {
+			showModal("No Files", "No .json files found in current directory.\nUsage: open <filename>")
+			return
+		}
+
+		// Create file picker list
+		fileList := tview.NewList()
+		fileList.ShowSecondaryText(false)
+		fileList.SetHighlightFullLine(true)
+		fileList.SetSelectedBackgroundColor(tview.Styles.TitleColor)
+		fileList.SetSelectedTextColor(tview.Styles.PrimitiveBackgroundColor)
+		fileList.SetBorder(true)
+		fileList.SetTitle("Select File to Open (↑↓ to navigate, Enter to open, Esc to cancel)")
+		fileList.SetBorderPadding(1, 1, 2, 2)
+
+		// Add files to list
+		for _, filename := range jsonFiles {
+			fname := filename // Capture for closure
+			fileList.AddItem(fname, "", 0, func() {
+				pages.HidePage("filepicker")
+				loadBook(fname)
+			})
+		}
+
+		// Handle escape key
+		fileList.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyEscape {
+				pages.HidePage("filepicker")
+				if currentView == ViewNotes {
+					app.SetFocus(notesArea)
+				} else if currentView == ViewWiki {
+					app.SetFocus(wikiArea)
+				} else {
+					app.SetFocus(textArea)
+				}
+				return nil
+			}
+			return event
+		})
+
+		// Show the file picker
+		pages.AddPage("filepicker", tview.NewGrid().
+			SetColumns(0, 60, 0).
+			SetRows(0, 20, 0).
+			AddItem(fileList, 1, 1, 1, 1, 0, 0, true), true, true)
+		app.SetFocus(fileList)
+	}
+
 	// --- COMMAND PROCESSING ---
 	handleCommand := func(cmdRaw string) {
 		cmdRaw = strings.TrimSpace(cmdRaw)
@@ -1070,7 +1134,7 @@ func main() {
 			if len(parts) > 1 {
 				loadBook(strings.Join(parts[1:], " "))
 			} else {
-				showModal("Error", "Usage: open <file>")
+				showFilePicker()
 			}
 		case "export":
 			if len(parts) > 1 {
@@ -1285,7 +1349,9 @@ Type to enter text.
 [yellow]wiki new <name>[white]: Add entry
 [yellow]wiki rename <name>[white]: Rename entry
 [yellow]wiki delete[white]: Delete entry
-[yellow]save/open/export <file>[white]: File ops
+[yellow]save <file>[white]: Save project
+[yellow]open[white]: Show file picker (or [yellow]open <file>[white] to open directly)
+[yellow]export <file>[white]: Export to text
 [yellow]notes[white] (or Ctrl-N): Toggle Notes
 [yellow]analyze[white]: Hemingway Analysis Mode
 [yellow]chapter new/delete/rename[white]: Manage chapters`)
