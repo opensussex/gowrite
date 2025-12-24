@@ -1,4 +1,4 @@
-// gowrite - A distraction-free writing tool with Hemingway Analysis and Story Bible
+// gowrite - A distraction-free writing tool with Hemingway Analysis and Story Wiki
 package main
 
 import (
@@ -25,7 +25,7 @@ type Chapter struct {
 	Target  int
 }
 
-// WikiEntry represents a single item in the Story Bible
+// WikiEntry represents a single item in the Story Wiki
 type WikiEntry struct {
 	Title   string
 	Content string
@@ -213,11 +213,11 @@ func main() {
 	notesArea.SetBorder(true)
 	notesArea.SetBorderPadding(1, 1, 2, 2)
 
-	// WIKI LIST (Story Bible)
+	// WIKI LIST (Story Wiki)
 	wikiList := tview.NewList()
 	wikiList.ShowSecondaryText(false)
 	wikiList.SetBorder(true)
-	wikiList.SetTitle("Story Bible (Ctrl-W to Close)")
+	wikiList.SetTitle("Story Wiki (Ctrl-W to Close)")
 	wikiList.SetSelectedBackgroundColor(tview.Styles.TitleColor)
 	wikiList.SetSelectedTextColor(tview.Styles.PrimitiveBackgroundColor)
 
@@ -341,7 +341,7 @@ func main() {
 			position.SetBackgroundColor(tcell.ColorBlack)
 		}
 	}
-	applyTheme("dark")
+	applyTheme("retro")
 
 	// --- 4. Logic & Helper Functions ---
 
@@ -468,8 +468,8 @@ func main() {
 		case ViewWiki:
 			// WIKI LAYOUT: List on left, Text on right
 			activeWidget = wikiList
-			title = "Story Bible"
-			helpInfo.SetText(" WIKI | Enter: Select | Tab: Edit Text | Ctrl-W: Close | 'wiki new/del' to manage")
+			title = "Story Wiki"
+			helpInfo.SetText(" Wiki | Enter: Select | Tab: Edit Text | Ctrl-W: Close | 'wiki new/del' to manage")
 
 			loadWiki(currentWikiIndex)
 
@@ -1345,7 +1345,7 @@ Type to enter text.
 	helpCmds.SetDynamicColors(true)
 	helpCmds.SetText(`[green]Commands (Ctrl-E)
 [yellow]structure <type>[white]: Apply template (3act, hero, cat, fichtean, horror)
-[yellow]wiki[white]: Open Story Bible (Ctrl-W to close)
+[yellow]wiki[white]: Open Story Wiki (Ctrl-W to close)
 [yellow]wiki new <name>[white]: Add entry
 [yellow]wiki rename <name>[white]: Rename entry
 [yellow]wiki delete[white]: Delete entry
