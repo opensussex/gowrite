@@ -37,6 +37,92 @@ type Project struct {
 	Wiki     []WikiEntry
 }
 
+// View state constants
+const (
+	ViewMain = iota
+	ViewNotes
+	ViewAnalyze
+	ViewWiki
+)
+
+// TargetWidth is the centered view column width
+const TargetWidth = 85
+
+// CalculateReadability computes ARI grade level from text
+func CalculateReadability(text string) string {
+	words := len(strings.Fields(text))
+	sentences := strings.Count(text, ".") + strings.Count(text, "!") + strings.Count(text, "?")
+	if sentences == 0 {
+		sentences = 1
+	}
+
+	chars := 0
+	for _, r := range text {
+		if !unicode.IsSpace(r) {
+			chars++
+		}
+	}
+	if words == 0 {
+		words = 1
+	}
+
+	ari := 4.71*(float64(chars)/float64(words)) + 0.5*(float64(words)/float64(sentences)) - 21.43
+	grade := int(math.Ceil(ari))
+	if grade < 1 {
+		grade = 1
+	}
+
+	return fmt.Sprintf("Grade %d", grade)
+}
+
+// AnalyzeTextForHemingway returns text with color markup for prose issues
+func AnalyzeTextForHemingway(text string) string {
+	adverbRegex := regexp.MustCompile(`(?i)\b(\w+ly)\b`)
+	passiveRegex := regexp.MustCompile(`(?i)\b(am|are|is|was|were|be|been|being)\b\s+(\w+ed)\b`)
+
+	paragraphs := strings.Split(text, "\n")
+	var processedText strings.Builder
+
+	for _, para := range paragraphs {
+		if strings.TrimSpace(para) == "" {
+			processedText.WriteString("\n")
+			continue
+		}
+
+		sentenceRe := regexp.MustCompile(`[^.!?]+[.!?]*`)
+		matches := sentenceRe.FindAllString(para, -1)
+
+		for _, s := range matches {
+			wordCount := len(strings.Fields(s))
+			coloredS := s
+
+			prefix := ""
+			suffix := ""
+
+			if wordCount > 20 {
+				prefix = "[red]"
+				suffix = "[-]"
+			} else if wordCount > 14 {
+				prefix = "[yellow]"
+				suffix = "[-]"
+			}
+
+			coloredS = adverbRegex.ReplaceAllStringFunc(coloredS, func(m string) string {
+				return "[blue]" + m + "[-]" + prefix
+			})
+
+			coloredS = passiveRegex.ReplaceAllStringFunc(coloredS, func(m string) string {
+				return "[green]" + m + "[-]" + prefix
+			})
+
+			processedText.WriteString(prefix + coloredS + suffix + " ")
+		}
+		processedText.WriteString("\n")
+	}
+
+	return processedText.String()
+}
+
 func main() {
 	// --- 0. THEME SETUP ---
 	tview.Styles.PrimitiveBackgroundColor = tcell.ColorBlack
@@ -66,20 +152,11 @@ func main() {
 	currentChapterIndex := 0
 	currentWikiIndex := 0
 	currentFilename := ""
-
-	// View States
-	const (
-		ViewMain = iota
-		ViewNotes
-		ViewAnalyze
-		ViewWiki
-	)
 	currentView := ViewMain
 
 	// Visual States
 	isCenteredView := false
 	isFocusMode := false // Hides all UI chrome
-	const TargetWidth = 85
 
 	dictionary := make(map[string]bool)
 	dictionaryLoaded := false
@@ -665,82 +742,13 @@ func main() {
 
 	// --- ANALYSIS LOGIC (Hemingway) ---
 
-	calculateReadability := func(text string) string {
-		words := len(strings.Fields(text))
-		sentences := strings.Count(text, ".") + strings.Count(text, "!") + strings.Count(text, "?")
-		if sentences == 0 {
-			sentences = 1
-		}
-
-		chars := 0
-		for _, r := range text {
-			if !unicode.IsSpace(r) {
-				chars++
-			}
-		}
-		if words == 0 {
-			words = 1
-		}
-
-		ari := 4.71*(float64(chars)/float64(words)) + 0.5*(float64(words)/float64(sentences)) - 21.43
-		grade := int(math.Ceil(ari))
-		if grade < 1 {
-			grade = 1
-		}
-
-		return fmt.Sprintf("Grade %d", grade)
-	}
-
 	runAnalysis := func() {
 		text := textArea.GetText()
-
-		adverbRegex := regexp.MustCompile(`(?i)\b(\w+ly)\b`)
-		passiveRegex := regexp.MustCompile(`(?i)\b(am|are|is|was|were|be|been|being)\b\s+(\w+ed)\b`)
-
-		paragraphs := strings.Split(text, "\n")
-		var processedText strings.Builder
-
-		for _, para := range paragraphs {
-			if strings.TrimSpace(para) == "" {
-				processedText.WriteString("\n")
-				continue
-			}
-
-			sentenceRe := regexp.MustCompile(`[^.!?]+[.!?]*`)
-			matches := sentenceRe.FindAllString(para, -1)
-
-			for _, s := range matches {
-				wordCount := len(strings.Fields(s))
-				coloredS := s
-
-				prefix := ""
-				suffix := ""
-
-				if wordCount > 20 {
-					prefix = "[red]"
-					suffix = "[-]"
-				} else if wordCount > 14 {
-					prefix = "[yellow]"
-					suffix = "[-]"
-				}
-
-				coloredS = adverbRegex.ReplaceAllStringFunc(coloredS, func(m string) string {
-					return "[blue]" + m + "[-]" + prefix
-				})
-
-				coloredS = passiveRegex.ReplaceAllStringFunc(coloredS, func(m string) string {
-					return "[green]" + m + "[-]" + prefix
-				})
-
-				processedText.WriteString(prefix + coloredS + suffix + " ")
-			}
-			processedText.WriteString("\n")
-		}
-
-		analysisView.SetText(processedText.String())
+		processedText := AnalyzeTextForHemingway(text)
+		analysisView.SetText(processedText)
 		setView(ViewAnalyze)
 
-		stats := calculateReadability(text)
+		stats := CalculateReadability(text)
 		key := "\n\n[::u]COLOR KEY[::-]\n" +
 			"[blue]• Adverbs[-]\n" +
 			"[green]• Passive Voice[-]\n" +
