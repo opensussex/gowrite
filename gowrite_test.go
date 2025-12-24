@@ -14,22 +14,27 @@ func TestCalculateReadability(t *testing.T) {
 		{
 			name:     "simple sentence",
 			text:     "The cat sat on the mat.",
-			expected: "Grade 1",
+			expected: "Reading Age: 5-6 (Grade 1)",
 		},
 		{
 			name:     "complex text",
 			text:     "The quick brown fox jumps over the lazy dog. This is a test sentence with more complexity and additional words to increase the grade level.",
-			expected: "Grade 7",
+			expected: "Reading Age: 11-12 (Grade 7)",
 		},
 		{
 			name:     "empty text",
 			text:     "",
-			expected: "Grade 1",
+			expected: "Reading Age: 5-6 (Grade 1)",
 		},
 		{
 			name:     "single word",
 			text:     "Hello",
-			expected: "Grade 3",
+			expected: "Reading Age: 7-8 (Grade 3)",
+		},
+		{
+			name:     "adult level text",
+			text:     "The implementation of sophisticated algorithmic methodologies necessitates comprehensive understanding of computational complexity theory and its practical applications in contemporary software engineering paradigms.",
+			expected: "Reading Age: 18+ (Adult) (Grade 32)",
 		},
 	}
 

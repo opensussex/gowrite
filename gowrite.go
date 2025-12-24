@@ -48,7 +48,7 @@ const (
 // TargetWidth is the centered view column width
 const TargetWidth = 85
 
-// CalculateReadability computes ARI grade level from text
+// CalculateReadability computes ARI grade level and returns age range
 func CalculateReadability(text string) string {
 	words := len(strings.Fields(text))
 	sentences := strings.Count(text, ".") + strings.Count(text, "!") + strings.Count(text, "?")
@@ -72,7 +72,39 @@ func CalculateReadability(text string) string {
 		grade = 1
 	}
 
-	return fmt.Sprintf("Grade %d", grade)
+	ageRange := "Adult"
+	switch grade {
+	case 1:
+		ageRange = "5-6"
+	case 2:
+		ageRange = "6-7"
+	case 3:
+		ageRange = "7-8"
+	case 4:
+		ageRange = "8-9"
+	case 5:
+		ageRange = "9-10"
+	case 6:
+		ageRange = "10-11"
+	case 7:
+		ageRange = "11-12"
+	case 8:
+		ageRange = "12-13"
+	case 9:
+		ageRange = "13-14"
+	case 10:
+		ageRange = "14-15"
+	case 11:
+		ageRange = "15-16"
+	case 12:
+		ageRange = "16-17"
+	case 13:
+		ageRange = "17-18"
+	default:
+		ageRange = "18+ (Adult)"
+	}
+
+	return fmt.Sprintf("Reading Age: %s (Grade %d)", ageRange, grade)
 }
 
 // AnalyzeTextForHemingway returns text with color markup for prose issues
