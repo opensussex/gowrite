@@ -1024,7 +1024,7 @@ func main() {
 		fileList.SetSelectedBackgroundColor(tview.Styles.TitleColor)
 		fileList.SetSelectedTextColor(tview.Styles.PrimitiveBackgroundColor)
 		fileList.SetBorder(true)
-		fileList.SetTitle("Select File to Open (↑↓ to navigate, Enter to open, Esc to cancel)")
+		fileList.SetTitle("Open file (↑↓ to navigate)")
 		fileList.SetBorderPadding(1, 1, 2, 2)
 
 		// Add files to list
