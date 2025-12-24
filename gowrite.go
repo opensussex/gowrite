@@ -249,7 +249,7 @@ func main() {
 	commandPalette.SetBorderPadding(0, 0, 1, 1)
 	commandPalette.SetTitle("Command Palette")
 
-	defaultHelpText := " F1: Help | Ctrl-G: Chapters | Ctrl-N: Notes | Ctrl-W: Wiki | Ctrl-E: Command"
+	defaultHelpText := " F1: Help | Ctrl-E: Command Palette"
 	helpInfo := tview.NewTextView()
 	helpInfo.SetText(defaultHelpText)
 	helpInfo.SetTextColor(tcell.ColorDarkGray)
