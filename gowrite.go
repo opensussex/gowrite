@@ -1,4 +1,4 @@
-// gowrite - A distraction-free writing tool with Hemingway Analysis and Story Wiki
+// ...existing code...
 package main
 
 import (
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1173,7 +1174,101 @@ func main() {
 		case "analyze":
 			runAnalysis()
 
-		// WIKI COMMANDS
+		// Import plain text into chapter
+		case "import":
+			// Usage:
+			//   import <file.txt>         -> overwrite current chapter with file contents
+			//   import new <file.txt>     -> create a new chapter with file contents (title = filename)
+			if len(parts) < 2 {
+				showModal("Error", "Usage: import <file.txt>  OR  import new <file.txt>")
+				break
+			}
+
+			// helper to validate .txt path
+			validateTxt := func(raw string) (string, bool) {
+				fn := strings.Join(strings.Fields(raw), " ")
+				fn = filepath.Clean(fn)
+				if !strings.HasSuffix(strings.ToLower(fn), ".txt") {
+					return fn, false
+				}
+				return fn, true
+			}
+
+			if parts[1] == "new" {
+				if len(parts) < 3 {
+					showModal("Error", "Usage: import new <file.txt>")
+					break
+				}
+				fn, ok := validateTxt(strings.Join(parts[2:], " "))
+				if !ok {
+					showModal("Error", "Only .txt files supported for import.")
+					break
+				}
+
+				flashStatusMessage("Importing file...")
+
+				// Read file off the UI goroutine, update UI via QueueUpdateDraw
+				go func(path string) {
+					data, err := os.ReadFile(path)
+					app.QueueUpdateDraw(func() {
+						if err != nil {
+							showModal("Error", fmt.Sprintf("Failed to read file: %v", err))
+							return
+						}
+
+						title := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+
+						mu.Lock()
+						chapters = append(chapters, Chapter{Title: title, Content: string(data), Notes: ""})
+						newIdx := len(chapters) - 1
+						mu.Unlock()
+
+						loadChapter(newIdx)
+						flashStatusMessage(fmt.Sprintf("Imported %s into new chapter '%s'", path, title))
+					})
+				}(fn)
+
+				break
+			}
+
+			// default: import into current chapter (overwrite)
+			fn, ok := validateTxt(strings.Join(parts[1:], " "))
+			if !ok {
+				showModal("Error", "Only .txt files supported for import.")
+				break
+			}
+
+			flashStatusMessage("Importing file...")
+
+			go func(path string) {
+				data, err := os.ReadFile(path)
+				app.QueueUpdateDraw(func() {
+					if err != nil {
+						showModal("Error", fmt.Sprintf("Failed to read file: %v", err))
+						return
+					}
+
+					mu.Lock()
+					defer mu.Unlock()
+
+					if currentChapterIndex < 0 || currentChapterIndex >= len(chapters) {
+						// append a new chapter if none valid
+						title := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+						chapters = append(chapters, Chapter{Title: title, Content: string(data)})
+						currentChapterIndex = len(chapters) - 1
+						loadChapter(currentChapterIndex)
+					} else {
+						chapters[currentChapterIndex].Content = string(data)
+						// update editor text/title
+						textArea.SetText(chapters[currentChapterIndex].Content, false)
+						textArea.SetTitle(fmt.Sprintf("gowrite - Chapter %d: %s", currentChapterIndex+1, chapters[currentChapterIndex].Title))
+					}
+
+					flashStatusMessage(fmt.Sprintf("Imported %s into Chapter %d", path, currentChapterIndex+1))
+				})
+			}(fn)
+
+			// WIKI COMMANDS
 		case "wiki":
 			if len(parts) > 1 {
 				sub := strings.ToLower(parts[1])
@@ -1278,7 +1373,7 @@ func main() {
 
 			// Intelligent focus restoration
 			isModal := false
-			for _, m := range []string{"help", "chapters", "list", "wordcount", "save", "open", "load", "export", "search", "replace", "spell", "theme", "analyze", "target", "chapter", "wiki", "structure"} {
+			for _, m := range []string{"help", "chapters", "list", "wordcount", "save", "open", "load", "export", "search", "replace", "spell", "theme", "analyze", "target", "chapter", "wiki", "structure", "import"} {
 				if strings.HasPrefix(cmd, m) {
 					isModal = true
 					break
@@ -1362,7 +1457,9 @@ Type to enter text.
 [yellow]export <file>[white]: Export to text
 [yellow]notes[white] (or Ctrl-N): Toggle Notes
 [yellow]analyze[white]: Hemingway Analysis Mode
-[yellow]chapter new/delete/rename[white]: Manage chapters`)
+[yellow]chapter new/delete/rename[white]: Manage chapters
+[yellow]import <file.txt>[white]: Import .txt into current chapter
+[yellow]import new <file.txt>[white]: Import .txt into a new chapter`)
 
 	// Setup the frame for Help pages
 	help := tview.NewFrame(help1)
