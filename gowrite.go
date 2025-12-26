@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -192,6 +193,7 @@ func main() {
 
 	dictionary := make(map[string]bool)
 	dictionaryLoaded := false
+	var mu sync.Mutex
 
 	// --- 2. Setup Main Components ---
 
@@ -864,6 +866,9 @@ func main() {
 
 	// --- FILE IO ---
 	saveBook := func(filename string, silent bool) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		saveCurrentChapter()
 		saveCurrentWiki() // Save Wiki entries too
 
@@ -911,6 +916,9 @@ func main() {
 	}
 
 	loadBook := func(filename string) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		if !strings.HasSuffix(filename, ".json") {
 			filename += ".json"
 		}
