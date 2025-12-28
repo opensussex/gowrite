@@ -191,6 +191,7 @@ func main() {
 	// Visual States
 	isCenteredView := false
 	isFocusMode := false // Hides all UI chrome
+	isLoading := false   // Suppress auto-saves while loading data
 
 	dictionary := make(map[string]bool)
 	dictionaryLoaded := false
@@ -370,6 +371,9 @@ func main() {
 	})
 
 	saveCurrentChapter := func() {
+		if isLoading {
+			return
+		}
 		if currentChapterIndex >= 0 && currentChapterIndex < len(chapters) {
 			chapters[currentChapterIndex].Content = textArea.GetText()
 			chapters[currentChapterIndex].Notes = notesArea.GetText()
@@ -377,6 +381,9 @@ func main() {
 	}
 
 	saveCurrentWiki := func() {
+		if isLoading {
+			return
+		}
 		if len(wikiEntries) > 0 && currentWikiIndex < len(wikiEntries) {
 			wikiEntries[currentWikiIndex].Content = wikiArea.GetText()
 		}
@@ -917,6 +924,9 @@ func main() {
 	}
 
 	loadBook := func(filename string) {
+		isLoading = true
+		defer func() { isLoading = false }()
+
 		mu.Lock()
 		defer mu.Unlock()
 
