@@ -3,7 +3,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -11,33 +10,21 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
+
+	"gowrite/commands"
+	"gowrite/persistence"
+	"gowrite/state"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
-// Chapter represents a section of the document
-type Chapter struct {
-	Title   string
-	Content string
-	Notes   string
-	Target  int
-}
-
-// WikiEntry represents a single item in the Story Wiki
-type WikiEntry struct {
-	Title   string
-	Content string
-}
-
-// Project represents the full save file structure (Chapters + Wiki)
-type Project struct {
-	Chapters []Chapter
-	Wiki     []WikiEntry
-}
+// Aliases to shared state types
+type Chapter = state.Chapter
+type WikiEntry = state.WikiEntry
+type Project = state.Project
 
 // View state constants
 const (
@@ -174,37 +161,23 @@ func main() {
 	app := tview.NewApplication()
 
 	// --- 1. Data Management ---
+	appState := state.NewAppState()
+	appState.SetView(ViewMain)
 
-	chapters := []Chapter{
-		{Title: "The Beginning", Content: "", Notes: "", Target: 0},
-	}
-
-	wikiEntries := []WikiEntry{
-		{Title: "General Notes", Content: ""},
-	}
-
-	currentChapterIndex := 0
-	currentWikiIndex := 0
-	currentFilename := ""
-	currentView := ViewMain
-
-	// Visual States
-	isCenteredView := false
-	isFocusMode := false // Hides all UI chrome
-	isLoading := false   // Suppress auto-saves while loading data
+	// Visual state tracked in AppState
 
 	dictionary := make(map[string]bool)
 	dictionaryLoaded := false
-	var mu sync.Mutex
 
 	// --- 2. Setup Main Components ---
 
 	// MAIN EDITOR
+	initialCh := appState.Snapshot().Chapters[0]
 	textArea := tview.NewTextArea()
 	textArea.SetWrap(true)
 	textArea.SetPlaceholder("Start writing your masterpiece...")
 	textArea.SetTextStyle(tcell.StyleDefault.Background(tcell.ColorBlack).Foreground(tcell.ColorWhite))
-	textArea.SetTitle(fmt.Sprintf("gowrite - Chapter 1: %s", chapters[0].Title))
+	textArea.SetTitle(fmt.Sprintf("gowrite - Chapter 1: %s", initialCh.Title))
 	textArea.SetBorder(true)
 	textArea.SetBorderPadding(1, 1, 2, 2)
 
@@ -355,7 +328,7 @@ func main() {
 
 		var hPadding int
 		// If centered view is ON and screen is wide enough to justify it
-		if isCenteredView && w > TargetWidth+4 {
+		if appState.Centered() && w > TargetWidth+4 {
 			hPadding = (w - TargetWidth) / 2
 		} else {
 			hPadding = 2 // Default small padding
@@ -370,35 +343,37 @@ func main() {
 		return false
 	})
 
+	// Forward-declared UI helpers
+	var showModal func(title, text string)
+	var showYesNoModal func(title, text string, onYes func())
+
 	saveCurrentChapter := func() {
-		if isLoading {
+		if appState.Loading() {
 			return
 		}
-		if currentChapterIndex >= 0 && currentChapterIndex < len(chapters) {
-			chapters[currentChapterIndex].Content = textArea.GetText()
-			chapters[currentChapterIndex].Notes = notesArea.GetText()
-		}
+		appState.SaveCurrentChapter(textArea.GetText(), notesArea.GetText())
 	}
 
 	saveCurrentWiki := func() {
-		if isLoading {
+		if appState.Loading() {
 			return
 		}
-		if len(wikiEntries) > 0 && currentWikiIndex < len(wikiEntries) {
-			wikiEntries[currentWikiIndex].Content = wikiArea.GetText()
-		}
+		appState.SaveCurrentWiki(wikiArea.GetText())
 	}
 
 	loadChapter := func(index int) {
 		saveCurrentChapter()
-		currentChapterIndex = index
-		chapter := chapters[index]
+		chapter, err := appState.LoadChapter(index)
+		if err != nil {
+			showModal("Error", err.Error())
+			return
+		}
 
 		textArea.SetText(chapter.Content, false)
 		notesArea.SetText(chapter.Notes, false)
 
 		title := fmt.Sprintf("gowrite - Chapter %d: %s", index+1, chapter.Title)
-		if currentView == ViewNotes {
+		if appState.CurrentView() == ViewNotes {
 			title += " (NOTES)"
 		}
 		textArea.SetTitle(title)
@@ -406,7 +381,7 @@ func main() {
 
 		pages.HidePage("modal")
 
-		if currentView == ViewNotes {
+		if appState.CurrentView() == ViewNotes {
 			app.SetFocus(notesArea)
 		} else {
 			app.SetFocus(textArea)
@@ -418,19 +393,20 @@ func main() {
 
 	loadWiki = func(index int) {
 		saveCurrentWiki()
-		if index < 0 || index >= len(wikiEntries) {
+		entry, err := appState.LoadWiki(index)
+		if err != nil {
+			showModal("Error", err.Error())
 			return
 		}
-		currentWikiIndex = index
-		entry := wikiEntries[index]
 
 		wikiArea.SetText(entry.Content, false)
 		wikiArea.SetTitle(fmt.Sprintf("Wiki: %s", entry.Title))
 
 		wikiList.Clear()
-		for i, w := range wikiEntries {
+		proj := appState.Snapshot()
+		for i, w := range proj.Wiki {
 			title := w.Title
-			if i == currentWikiIndex {
+			if i == appState.CurrentWikiIndex() {
 				title += " *"
 			}
 			idx := i
@@ -439,33 +415,38 @@ func main() {
 				app.SetFocus(wikiArea)
 			})
 		}
-		wikiList.SetCurrentItem(currentWikiIndex)
+		wikiList.SetCurrentItem(appState.CurrentWikiIndex())
 	}
 
 	setView := func(viewType int) {
-		if currentView == ViewWiki {
+		if appState.CurrentView() == ViewWiki {
 			saveCurrentWiki()
 		} else {
 			saveCurrentChapter()
 		}
 
-		currentView = viewType
+		appState.SetView(viewType)
 		mainView.Clear()
 
 		var activeWidget tview.Primitive
 		var title string
-		chapter := chapters[currentChapterIndex]
+		proj := appState.Snapshot()
+		chapterIdx := appState.CurrentChapterIndex()
+		if chapterIdx >= len(proj.Chapters) {
+			chapterIdx = 0
+		}
+		chapter := proj.Chapters[chapterIdx]
 
 		switch viewType {
 		case ViewMain:
 			activeWidget = textArea
-			title = fmt.Sprintf("gowrite - Chapter %d: %s", currentChapterIndex+1, chapter.Title)
+			title = fmt.Sprintf("gowrite - Chapter %d: %s", chapterIdx+1, chapter.Title)
 			helpInfo.SetText(defaultHelpText)
 			mainView.SetColumns(0) // Reset to single column
 
 		case ViewNotes:
 			activeWidget = notesArea
-			title = fmt.Sprintf("gowrite - Chapter %d: %s (NOTES)", currentChapterIndex+1, chapter.Title)
+			title = fmt.Sprintf("gowrite - Chapter %d: %s (NOTES)", chapterIdx+1, chapter.Title)
 			helpInfo.SetText(" EDITING NOTES | Ctrl-N: Back | Ctrl-T: Center | Ctrl-F: Focus Mode")
 			mainView.SetColumns(0) // Reset to single column
 
@@ -481,7 +462,7 @@ func main() {
 			title = "Story Wiki"
 			helpInfo.SetText(" Wiki | Enter: Select | Tab: Edit Text | Ctrl-W: Close | 'wiki new/del' to manage")
 
-			loadWiki(currentWikiIndex)
+			loadWiki(appState.CurrentWikiIndex())
 
 			mainView.SetColumns(30, 0)
 			mainView.SetRows(0, 3, 1)
@@ -492,7 +473,7 @@ func main() {
 			mainView.AddItem(helpInfo, 2, 0, 1, 1, 0, 0, false)
 			mainView.AddItem(position, 2, 1, 1, 1, 0, 0, false)
 
-			if isFocusMode {
+			if appState.FocusMode() {
 				mainView.SetRows(0)
 				mainView.AddItem(wikiList, 0, 0, 1, 1, 0, 0, true)
 				mainView.AddItem(wikiArea, 0, 1, 1, 1, 0, 0, false)
@@ -508,7 +489,7 @@ func main() {
 		}
 
 		// 3. Apply Layout for Standard Views (Main, Notes, Analyze)
-		if isFocusMode {
+		if appState.FocusMode() {
 			// FOCUS: Single row, no borders, full height
 			mainView.SetRows(0)
 			mainView.AddItem(activeWidget, 0, 0, 1, 2, 0, 0, true)
@@ -540,7 +521,8 @@ func main() {
 	}
 
 	toggleNotes := func() {
-		if currentView == ViewNotes || currentView == ViewWiki {
+		view := appState.CurrentView()
+		if view == ViewNotes || view == ViewWiki {
 			setView(ViewMain)
 		} else {
 			setView(ViewNotes)
@@ -548,7 +530,7 @@ func main() {
 	}
 
 	toggleWiki := func() {
-		if currentView == ViewWiki {
+		if appState.CurrentView() == ViewWiki {
 			setView(ViewMain)
 		} else {
 			setView(ViewWiki)
@@ -556,24 +538,25 @@ func main() {
 	}
 
 	toggleFocus := func() {
-		isFocusMode = !isFocusMode
-		setView(currentView)
+		appState.ToggleFocus()
+		setView(appState.CurrentView())
 	}
 
-	showModal := func(title, text string) {
+	showModal = func(title, text string) {
 		modal := tview.NewModal()
 		modal.SetText(text)
 		modal.AddButtons([]string{"OK"})
 		modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			pages.HidePage("modal")
 			// Restore focus
-			if currentView == ViewNotes {
+			switch appState.CurrentView() {
+			case ViewNotes:
 				app.SetFocus(notesArea)
-			} else if currentView == ViewAnalyze {
+			case ViewAnalyze:
 				app.SetFocus(analysisView)
-			} else if currentView == ViewWiki {
+			case ViewWiki:
 				app.SetFocus(wikiArea)
-			} else {
+			default:
 				app.SetFocus(textArea)
 			}
 		})
@@ -581,11 +564,12 @@ func main() {
 		modal.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
 			if e.Key() == tcell.KeyEnter {
 				pages.HidePage("modal")
-				if currentView == ViewNotes {
+				switch appState.CurrentView() {
+				case ViewNotes:
 					app.SetFocus(notesArea)
-				} else if currentView == ViewWiki {
+				case ViewWiki:
 					app.SetFocus(wikiArea)
-				} else {
+				default:
 					app.SetFocus(textArea)
 				}
 				return nil
@@ -601,7 +585,7 @@ func main() {
 		app.SetFocus(modal)
 	}
 
-	showYesNoModal := func(title, text string, onYes func()) {
+	showYesNoModal = func(title, text string, onYes func()) {
 		modal := tview.NewModal()
 		modal.SetText(text)
 		modal.AddButtons([]string{"Yes", "No"})
@@ -610,11 +594,12 @@ func main() {
 				onYes()
 			}
 			pages.HidePage("modal")
-			if currentView == ViewNotes {
+			switch appState.CurrentView() {
+			case ViewNotes:
 				app.SetFocus(notesArea)
-			} else if currentView == ViewWiki {
+			case ViewWiki:
 				app.SetFocus(wikiArea)
-			} else {
+			default:
 				app.SetFocus(textArea)
 			}
 		})
@@ -639,33 +624,29 @@ func main() {
 
 	// --- CHAPTER OPS ---
 	deleteChapter := func(index int) {
-		if len(chapters) <= 1 {
+		proj := appState.Snapshot()
+		if len(proj.Chapters) <= 1 {
 			showModal("Error", "Cannot delete only chapter.")
-			return
-		}
-		if index < 0 || index >= len(chapters) {
-			showModal("Error", "Invalid chapter.")
 			return
 		}
 
 		showYesNoModal("Confirm", fmt.Sprintf("Delete Chapter %d?", index+1), func() {
-			chapters = append(chapters[:index], chapters[index+1:]...)
-			if index < currentChapterIndex {
-				currentChapterIndex--
-			} else if index == currentChapterIndex && currentChapterIndex >= len(chapters) {
-				currentChapterIndex = len(chapters) - 1
+			newIdx, err := appState.DeleteChapter(index)
+			if err != nil {
+				showModal("Error", err.Error())
+				return
 			}
-			loadChapter(currentChapterIndex)
+			loadChapter(newIdx)
 		})
 	}
 
 	renameChapter := func(index int, newName string) {
-		if index < 0 || index >= len(chapters) {
+		if err := appState.RenameChapter(index, newName); err != nil {
+			showModal("Error", err.Error())
 			return
 		}
-		chapters[index].Title = newName
-		if index == currentChapterIndex {
-			loadChapter(currentChapterIndex)
+		if index == appState.CurrentChapterIndex() {
+			loadChapter(index)
 		} else {
 			showModal("Success", fmt.Sprintf("Renamed Chapter %d to '%s'", index+1, newName))
 		}
@@ -673,113 +654,41 @@ func main() {
 
 	// --- STRUCTURE TEMPLATES ---
 	applyStructure := func(name string) {
-		var newChapters []Chapter
-		name = strings.ToLower(name)
-
-		switch name {
-		case "3act", "standard":
-			newChapters = []Chapter{
-				{Title: "Act 1: The Setup", Notes: "Introduce characters and the ordinary world.\nEstablish the status quo and the flaw that holds them back.", Content: ">> GUIDANCE: Introduce the protagonist in their 'Ordinary World'. Establish the status quo and the flaw that holds them back."},
-				{Title: "Inciting Incident", Notes: "Something happens that disrupts the status quo.\nThe hero faces a problem they cannot ignore.", Content: ">> GUIDANCE: An external event disrupts the status quo. The hero faces a problem they cannot ignore."},
-				{Title: "Plot Point 1", Notes: "The hero leaves the ordinary world.\nThe hero decides to engage with the problem.", Content: ">> GUIDANCE: The hero decides to engage with the problem. They leave their comfort zone and cross into the 'Special World'."},
-				{Title: "Act 2: The Confrontation", Notes: "Rising action, tests, allies, and enemies.", Content: ">> GUIDANCE: Rising action. The hero meets allies and enemies. They face tests that force them to learn new skills."},
-				{Title: "Midpoint", Notes: "A major event shifts the context (false victory/defeat).\nThe stakes are raised; there is no turning back.", Content: ">> GUIDANCE: A major event shifts the context (a false victory or defeat). The stakes are raised; there is no turning back."},
-				{Title: "Plot Point 2", Notes: "All hope seems lost (The Dark Night of the Soul).\nThe hero must find a new solution or inner strength.", Content: ">> GUIDANCE: All hope seems lost. The hero must find a new solution or inner strength."},
-				{Title: "Act 3: The Resolution", Notes: "The final battle/climax.\nThe hero faces the antagonist one last time.", Content: ">> GUIDANCE: The Climax. The hero faces the antagonist one last time. They must use the lessons learned in Act 2 to win."},
-				{Title: "The End", Notes: "The aftermath. Establish the 'New Normal'.\nShow how the hero has changed.", Content: ">> GUIDANCE: The aftermath. Establish the 'New Normal'. Show how the hero has changed."},
-			}
-		case "hero", "monomyth":
-			newChapters = []Chapter{
-				{Title: "The Ordinary World", Notes: "Status Quo.", Content: ">> GUIDANCE: Show the hero's life before the journey. Highlight their dissatisfaction or lack of completeness."},
-				{Title: "Call to Adventure", Notes: "Disruption.", Content: ">> GUIDANCE: Something shakes up the situation. The hero is presented with a challenge or opportunity."},
-				{Title: "Refusal of the Call", Notes: "Fear or hesitation.", Content: ">> GUIDANCE: The hero hesitates due to fear or insecurity. Why are they afraid to leave?"},
-				{Title: "Meeting the Mentor", Notes: "Gaining tools/advice.", Content: ">> GUIDANCE: The hero gains supplies, advice, or confidence from a mentor. They are now ready to face the journey."},
-				{Title: "Crossing the Threshold", Notes: "Leaving the known world.", Content: ">> GUIDANCE: The hero commits to leaving the Ordinary World. They enter the Special World with different rules."},
-				{Title: "Tests, Allies, Enemies", Notes: "Learning the rules.", Content: ">> GUIDANCE: The hero explores the new world. They make friends and attract enemies."},
-				{Title: "Approach to the Cave", Notes: "Preparing for the main danger.", Content: ">> GUIDANCE: The hero prepares for the major challenge. Plans are made, and the team is gathered."},
-				{Title: "The Ordeal", Notes: "Death and rebirth moment.", Content: ">> GUIDANCE: The central crisis (midpoint). A brush with death. The hero confronts their greatest fear."},
-				{Title: "The Reward", Notes: "Seizing the sword.", Content: ">> GUIDANCE: The hero seizes the object of their quest (sword, elixir, knowledge). But the danger is not over yet."},
-				{Title: "The Road Back", Notes: "The chase scene/urgency.", Content: ">> GUIDANCE: The hero is pursued by the vengeful forces. The urgency ramps up for the final escape."},
-				{Title: "Resurrection", Notes: "Final test.", Content: ">> GUIDANCE: The final test. The hero is purified by a last sacrifice. They must prove they have truly learned the lesson."},
-				{Title: "Return with Elixir", Notes: "Master of two worlds.", Content: ">> GUIDANCE: The hero returns home, transformed. They bring back something that heals the Ordinary World."},
-			}
-		case "cat", "save the cat":
-			newChapters = []Chapter{
-				{Title: "Opening Image", Notes: "Snapshot of life before.", Content: ">> GUIDANCE: A visual snapshot of the status quo. Set the tone and mood."},
-				{Title: "Theme Stated", Notes: "What the story is really about.", Content: ">> GUIDANCE: Someone (usually not the hero) states the theme of the story. The hero doesn't understand it yet."},
-				{Title: "Setup", Notes: "Expanding on the hero's flaws.", Content: ">> GUIDANCE: Expand on the hero's life and flaws. Show why they need to change (Stasis = Death)."},
-				{Title: "Catalyst", Notes: "Life changes forever.", Content: ">> GUIDANCE: The Inciting Incident. Life changes forever; they can't go back."},
-				{Title: "Debate", Notes: "Can I do this?", Content: ">> GUIDANCE: The hero reacts to the catalyst. They question what to do (Refusal of the Call)."},
-				{Title: "Break into Two", Notes: "Choosing the journey.", Content: ">> GUIDANCE: The hero makes a proactive choice to enter the new world. Act 2 begins."},
-				{Title: "B Story", Notes: "Love interest or subplot.", Content: ">> GUIDANCE: Introduce the love interest or subplot character. This relationship discusses the theme."},
-				{Title: "Fun and Games", Notes: "The 'trailer' moments.", Content: ">> GUIDANCE: The 'Promise of the Premise'. Show scenes that audiences came to see."},
-				{Title: "Midpoint", Notes: "Stakes raise significantly.", Content: ">> GUIDANCE: Stakes raise significantly (False Victory or False Defeat). The 'clock' starts ticking."},
-				{Title: "Bad Guys Close In", Notes: "Pressure mounts.", Content: ">> GUIDANCE: Internal and external pressure mounts. The hero's plan starts to fail."},
-				{Title: "All Is Lost", Notes: "Whiff of death.", Content: ">> GUIDANCE: The lowest point. Something dies (literally or metaphorically). The hero loses hope."},
-				{Title: "Dark Night of the Soul", Notes: "Wallowing in hopelessness.", Content: ">> GUIDANCE: The hero wallows in their hopelessness. But in the darkness, they find the true solution."},
-				{Title: "Break into Three", Notes: "The new idea/solution.", Content: ">> GUIDANCE: The hero realizes the answer (fixing the flaw). They devise a new plan."},
-				{Title: "Finale", Notes: "Executing the plan.", Content: ">> GUIDANCE: The hero executes the plan and defeats the bad guys. The old world is destroyed/changed."},
-				{Title: "Final Image", Notes: "Mirror of opening image.", Content: ">> GUIDANCE: Mirror of the Opening Image. Show visually how much the hero has changed."},
-			}
-		case "fichtean":
-			newChapters = []Chapter{
-				{Title: "Inciting Incident", Notes: "Start immediately with the problem.", Content: ">> GUIDANCE: Skip the setup. Start immediately with the problem. Throw the reader into the action."},
-				{Title: "Crisis 1", Notes: "First obstacle. Rising action.", Content: ">> GUIDANCE: The first major obstacle. The hero tries to solve it but complications arise."},
-				{Title: "Crisis 2", Notes: "Higher stakes obstacle.", Content: ">> GUIDANCE: The stakes get higher. The problem expands or gets more personal."},
-				{Title: "Crisis 3", Notes: "Even higher stakes.", Content: ">> GUIDANCE: The situation seems dire. The hero's resources are running thin."},
-				{Title: "The Climax", Notes: "Maximum tension.", Content: ">> GUIDANCE: Maximum tension. The final confrontation. The hero succeeds or fails."},
-				{Title: "Falling Action", Notes: "Loose ends tied.", Content: ">> GUIDANCE: Loose ends are tied up. The immediate aftermath of the climax."},
-				{Title: "Resolution", Notes: "New normal.", Content: ">> GUIDANCE: The new normal is established. A brief moment of calm."},
-			}
-		case "horror":
-			newChapters = []Chapter{
-				{Title: "The Dreadful Normal", Notes: "Establish status quo with unease.", Content: ">> GUIDANCE: Establish the setting and characters. Create a subtle sense of unease or isolation despite the normalcy."},
-				{Title: "The Omen", Notes: "A warning sign.", Content: ">> GUIDANCE: A warning sign appears but is ignored or rationalized. The first subtle brush with the entity."},
-				{Title: "The Onset", Notes: "The threat reveals itself.", Content: ">> GUIDANCE: The threat reveals itself properly. The first scare or victim. There is no going back now."},
-				{Title: "The Discovery", Notes: "Realization of the horror.", Content: ">> GUIDANCE: The characters realize what they are dealing with. Escape attempts fail. Isolation is complete."},
-				{Title: "The Pursuit", Notes: "Cat and Mouse.", Content: ">> GUIDANCE: The entity attacks. High tension chase or siege. The characters are stripped of resources."},
-				{Title: "The Confrontation", Notes: "The final stand.", Content: ">> GUIDANCE: The final stand. The remaining survivors must face the horror head-on. High casualty rate."},
-				{Title: "The Aftermath", Notes: "Survival... or is it?", Content: ">> GUIDANCE: The evil is defeated... or is it? The survivors escape, but they are changed forever."},
-			}
-		default:
-			showModal("Error", "Unknown structure.\nTry: 3act, hero, cat, fichtean, horror")
+		if err := appState.ApplyStructure(name); err != nil {
+			showModal("Error", err.Error())
 			return
 		}
-
-		showYesNoModal("Warning", fmt.Sprintf("This will ERASE all current chapters and apply '%s'. Continue?", name), func() {
-			chapters = newChapters
-			currentChapterIndex = 0
-			// FIX: Manually update UI to avoid 'loadChapter' saving old blank text over new template
-			textArea.SetText(chapters[0].Content, false)
-			notesArea.SetText(chapters[0].Notes, false)
-			textArea.SetTitle(fmt.Sprintf("gowrite - Chapter 1: %s", chapters[0].Title))
-			flashStatusMessage("Applied Structure: " + name)
-		})
+		proj := appState.Snapshot()
+		textArea.SetText(proj.Chapters[0].Content, false)
+		notesArea.SetText(proj.Chapters[0].Notes, false)
+		textArea.SetTitle(fmt.Sprintf("gowrite - Chapter 1: %s", proj.Chapters[0].Title))
+		flashStatusMessage("Applied Structure: " + name)
 	}
 
 	// --- WIKI OPS ---
 	deleteWiki := func(index int) {
-		if len(wikiEntries) <= 1 {
+		proj := appState.Snapshot()
+		if len(proj.Wiki) <= 1 {
 			showModal("Error", "Cannot delete the only wiki entry.")
 			return
 		}
-		showYesNoModal("Confirm", fmt.Sprintf("Delete Wiki Entry '%s'?", wikiEntries[index].Title), func() {
-			wikiEntries = append(wikiEntries[:index], wikiEntries[index+1:]...)
-			if index < currentWikiIndex {
-				currentWikiIndex--
-			} else if index == currentWikiIndex && currentWikiIndex >= len(wikiEntries) {
-				currentWikiIndex = len(wikiEntries) - 1
+		title := proj.Wiki[index].Title
+		showYesNoModal("Confirm", fmt.Sprintf("Delete Wiki Entry '%s'?", title), func() {
+			newIdx, err := appState.DeleteWiki(index)
+			if err != nil {
+				showModal("Error", err.Error())
+				return
 			}
-			loadWiki(currentWikiIndex)
+			loadWiki(newIdx)
 		})
 	}
 
 	renameWiki := func(index int, newName string) {
-		if index < 0 || index >= len(wikiEntries) {
+		if err := appState.RenameWiki(index, newName); err != nil {
+			showModal("Error", err.Error())
 			return
 		}
-		wikiEntries[index].Title = newName
-		loadWiki(currentWikiIndex)
+		loadWiki(appState.CurrentWikiIndex())
 	}
 
 	// --- ANALYSIS LOGIC (Hemingway) ---
@@ -824,9 +733,10 @@ func main() {
 		}
 
 		targetArea := textArea
-		if currentView == ViewNotes {
+		view := appState.CurrentView()
+		if view == ViewNotes {
 			targetArea = notesArea
-		} else if currentView == ViewWiki {
+		} else if view == ViewWiki {
 			targetArea = wikiArea
 		}
 
@@ -874,48 +784,27 @@ func main() {
 
 	// --- FILE IO ---
 	saveBook := func(filename string, silent bool) {
-		mu.Lock()
-		defer mu.Unlock()
-
 		saveCurrentChapter()
-		saveCurrentWiki() // Save Wiki entries too
+		saveCurrentWiki()
 
 		if filename == "" {
-			if currentFilename == "" {
-				if !silent {
-					showModal("Error", "Please provide a filename: 'save <name>'")
-				}
-				return
+			filename = appState.CurrentFilename()
+		}
+		if filename == "" {
+			if !silent {
+				showModal("Error", "Please provide a filename: 'save <name>'")
 			}
-			filename = currentFilename
-		}
-		if !strings.HasSuffix(filename, ".json") {
-			filename += ".json"
+			return
 		}
 
-		// Create project struct to hold both Chapters and Wiki
-		projectData := Project{
-			Chapters: chapters,
-			Wiki:     wikiEntries,
-		}
-
-		data, err := json.MarshalIndent(projectData, "", "  ")
-		if err != nil {
+		proj := appState.Snapshot()
+		if err := persistence.SaveProject(filename, proj); err != nil {
 			if !silent {
 				showModal("Error", err.Error())
 			}
 			return
 		}
-
-		err = os.WriteFile(filename, data, 0644)
-		if err != nil {
-			if !silent {
-				showModal("Error", err.Error())
-			}
-			return
-		}
-
-		currentFilename = filename
+		appState.SetCurrentFilename(filename)
 		if silent {
 			flashStatusMessage(fmt.Sprintf(" [Autosaved to %s at %s] ", filename, time.Now().Format("15:04:05")))
 		} else {
@@ -924,58 +813,19 @@ func main() {
 	}
 
 	loadBook := func(filename string) {
-		isLoading = true
-		defer func() { isLoading = false }()
+		appState.SetLoading(true)
+		defer func() { appState.SetLoading(false) }()
 
-		mu.Lock()
-		defer mu.Unlock()
-
-		if !strings.HasSuffix(filename, ".json") {
-			filename += ".json"
-		}
-		data, err := os.ReadFile(filename)
+		proj, err := persistence.LoadProject(filename)
 		if err != nil {
 			showModal("Error", err.Error())
 			return
 		}
 
-		// Try loading as Project struct (New format)
-		var projectData Project
-		err = json.Unmarshal(data, &projectData)
-
-		validLoad := false
-
-		if err == nil && len(projectData.Chapters) > 0 {
-			// Success: It's the new format
-			chapters = projectData.Chapters
-			wikiEntries = projectData.Wiki
-			validLoad = true
-		} else {
-			// Failure: Try loading as old format (Just Array of Chapters)
-			var oldChapters []Chapter
-			if err2 := json.Unmarshal(data, &oldChapters); err2 == nil && len(oldChapters) > 0 {
-				chapters = oldChapters
-				wikiEntries = []WikiEntry{{Title: "General", Content: ""}} // Default wiki
-				validLoad = true
-			}
-		}
-
-		if !validLoad {
-			showModal("Error", "File empty or corrupt.")
-			return
-		}
-
-		// Ensure Wiki isn't empty if loading from old file
-		if len(wikiEntries) == 0 {
-			wikiEntries = []WikiEntry{{Title: "General", Content: ""}}
-		}
-
-		// STATE RESET
-		currentFilename = filename
-		currentChapterIndex = 0
-		currentWikiIndex = 0
-		currentView = ViewMain
-		isFocusMode = false
+		appState.SetProject(proj)
+		appState.SetCurrentFilename(filename)
+		appState.SetView(ViewMain)
+		appState.SetFocusMode(false)
 
 		setView(ViewMain)
 		loadChapter(0)
@@ -983,34 +833,15 @@ func main() {
 		showModal("Success", fmt.Sprintf("Loaded %s", filename))
 	}
 
-	exportBook := func(filename string) {
-		saveCurrentChapter()
-		if filename == "" {
-			showModal("Error", "Usage: export <filename>")
-			return
-		}
-		if !strings.Contains(filename, ".") {
-			filename += ".txt"
-		}
-
-		var sb strings.Builder
-		for i, chap := range chapters {
-			sb.WriteString(fmt.Sprintf("# Chapter %d: %s\n\n", i+1, chap.Title))
-			sb.WriteString(chap.Content)
-			sb.WriteString("\n\n")
-		}
-		if err := os.WriteFile(filename, []byte(sb.String()), 0644); err != nil {
-			showModal("Error", err.Error())
-		} else {
-			showModal("Success", fmt.Sprintf("Exported to %s", filename))
-		}
-	}
-
 	go func() {
 		ticker := time.NewTicker(60 * time.Second)
 		for range ticker.C {
-			if currentFilename != "" {
-				app.QueueUpdateDraw(func() { saveBook(currentFilename, true) })
+			if appState.Loading() {
+				continue
+			}
+			fname := appState.CurrentFilename()
+			if fname != "" {
+				app.QueueUpdateDraw(func() { saveBook(fname, true) })
 			}
 		}
 	}()
@@ -1059,11 +890,12 @@ func main() {
 		fileList.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 			if event.Key() == tcell.KeyEscape {
 				pages.HidePage("filepicker")
-				if currentView == ViewNotes {
+				switch appState.CurrentView() {
+				case ViewNotes:
 					app.SetFocus(notesArea)
-				} else if currentView == ViewWiki {
+				case ViewWiki:
 					app.SetFocus(wikiArea)
-				} else {
+				default:
 					app.SetFocus(textArea)
 				}
 				return nil
@@ -1088,6 +920,38 @@ func main() {
 		}
 		cmd := strings.ToLower(parts[0])
 
+		// Delegate to shared command registry where possible
+		if handler, ok := commands.Registry[cmd]; ok {
+			if (cmd == "open" || cmd == "load") && len(parts) == 1 {
+				showFilePicker()
+				return
+			}
+			if cmd == "save" || cmd == "export" {
+				saveCurrentChapter()
+				saveCurrentWiki()
+			}
+
+			res := handler(parts[1:], appState)
+			if res.Err != nil {
+				showModal("Error", res.Err.Error())
+				return
+			}
+
+			if cmd == "open" || cmd == "load" {
+				appState.SetView(ViewMain)
+				appState.SetFocusMode(false)
+				setView(ViewMain)
+				loadChapter(appState.CurrentChapterIndex())
+			}
+
+			if res.Modal {
+				showModal("Success", res.Message)
+			} else if res.Message != "" {
+				flashStatusMessage(res.Message)
+			}
+			return
+		}
+
 		switch cmd {
 		case "quit", "exit":
 			app.Stop()
@@ -1097,9 +961,10 @@ func main() {
 			setView(ViewMain)
 		case "wordcount":
 			targetArea := textArea
-			if currentView == ViewNotes {
+			view := appState.CurrentView()
+			if view == ViewNotes {
 				targetArea = notesArea
-			} else if currentView == ViewWiki {
+			} else if view == ViewWiki {
 				targetArea = wikiArea
 			}
 			text := targetArea.GetText()
@@ -1120,11 +985,12 @@ func main() {
 			list.SetTitle("Chapters (< & > reorder)")
 			list.SetBorderPadding(1, 1, 2, 2)
 
-			// Simple populate logic
-			for i, chap := range chapters {
+			proj := appState.Snapshot()
+			currentIdx := appState.CurrentChapterIndex()
+			for i, chap := range proj.Chapters {
 				idx := i
 				title := fmt.Sprintf("%d. %s", i+1, chap.Title)
-				if i == currentChapterIndex {
+				if i == currentIdx {
 					title += " (Current)"
 				}
 				list.AddItem(title, "", 0, func() { loadChapter(idx) })
@@ -1142,32 +1008,14 @@ func main() {
 			grid := tview.NewGrid().SetColumns(0, 40, 0).SetRows(0, 20, 0).AddItem(list, 1, 1, 1, 1, 0, 0, true)
 			pages.AddPage("modal", grid, true, true)
 			app.SetFocus(list)
-
-		case "save":
-			f := ""
-			if len(parts) > 1 {
-				f = strings.Join(parts[1:], " ")
-			}
-			saveBook(f, false)
-		case "open", "load":
-			if len(parts) > 1 {
-				loadBook(strings.Join(parts[1:], " "))
-			} else {
-				showFilePicker()
-			}
-		case "export":
-			if len(parts) > 1 {
-				exportBook(strings.Join(parts[1:], " "))
-			} else {
-				showModal("Error", "Usage: export <file>")
-			}
 		case "search":
 			if len(parts) > 1 {
 				term := strings.Join(parts[1:], " ")
 				targetArea := textArea
-				if currentView == ViewNotes {
+				view := appState.CurrentView()
+				if view == ViewNotes {
 					targetArea = notesArea
-				} else if currentView == ViewWiki {
+				} else if view == ViewWiki {
 					targetArea = wikiArea
 				}
 				count := strings.Count(targetArea.GetText(), term)
@@ -1228,11 +1076,8 @@ func main() {
 
 						title := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 
-						mu.Lock()
-						chapters = append(chapters, Chapter{Title: title, Content: string(data), Notes: ""})
-						newIdx := len(chapters) - 1
-						mu.Unlock()
-
+						newIdx := appState.NewChapter(title)
+						appState.SaveCurrentChapter(string(data), "")
 						loadChapter(newIdx)
 						flashStatusMessage(fmt.Sprintf("Imported %s into new chapter '%s'", path, title))
 					})
@@ -1258,23 +1103,27 @@ func main() {
 						return
 					}
 
-					mu.Lock()
-					defer mu.Unlock()
+					content := string(data)
+					proj := appState.Snapshot()
+					currentIdx := appState.CurrentChapterIndex()
 
-					if currentChapterIndex < 0 || currentChapterIndex >= len(chapters) {
-						// append a new chapter if none valid
+					if currentIdx < 0 || currentIdx >= len(proj.Chapters) {
 						title := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-						chapters = append(chapters, Chapter{Title: title, Content: string(data)})
-						currentChapterIndex = len(chapters) - 1
-						loadChapter(currentChapterIndex)
-					} else {
-						chapters[currentChapterIndex].Content = string(data)
-						// update editor text/title
-						textArea.SetText(chapters[currentChapterIndex].Content, false)
-						textArea.SetTitle(fmt.Sprintf("gowrite - Chapter %d: %s", currentChapterIndex+1, chapters[currentChapterIndex].Title))
+						newIdx := appState.NewChapter(title)
+						appState.SaveCurrentChapter(content, "")
+						loadChapter(newIdx)
+						flashStatusMessage(fmt.Sprintf("Imported %s into new chapter '%s'", path, title))
+						return
 					}
 
-					flashStatusMessage(fmt.Sprintf("Imported %s into Chapter %d", path, currentChapterIndex+1))
+					notes := notesArea.GetText()
+					appState.SaveCurrentChapter(content, notes)
+					updated := appState.Snapshot()
+					title := updated.Chapters[currentIdx].Title
+					textArea.SetText(content, false)
+					textArea.SetTitle(fmt.Sprintf("gowrite - Chapter %d: %s", currentIdx+1, title))
+
+					flashStatusMessage(fmt.Sprintf("Imported %s into Chapter %d", path, currentIdx+1))
 				})
 			}(fn)
 
@@ -1288,14 +1137,14 @@ func main() {
 					if len(parts) > 2 {
 						title = strings.Join(parts[2:], " ")
 					}
-					wikiEntries = append(wikiEntries, WikiEntry{Title: title, Content: ""})
-					currentWikiIndex = len(wikiEntries) - 1
+					newIdx := appState.NewWiki(title)
+					loadWiki(newIdx)
 					setView(ViewWiki)
 				} else if sub == "delete" {
-					deleteWiki(currentWikiIndex)
+					deleteWiki(appState.CurrentWikiIndex())
 				} else if sub == "rename" {
 					if len(parts) > 2 {
-						renameWiki(currentWikiIndex, strings.Join(parts[2:], " "))
+						renameWiki(appState.CurrentWikiIndex(), strings.Join(parts[2:], " "))
 					}
 				} else {
 					// Assume they typed 'wiki searchterm' or similar, but for now just open view
@@ -1321,10 +1170,10 @@ func main() {
 						title = strings.Join(parts[2:], " ")
 					}
 					saveCurrentChapter()
-					chapters = append(chapters, Chapter{Title: title})
-					loadChapter(len(chapters) - 1)
+					newIdx := appState.NewChapter(title)
+					loadChapter(newIdx)
 				} else if sub == "delete" {
-					idx := currentChapterIndex
+					idx := appState.CurrentChapterIndex()
 					if len(parts) > 2 {
 						if n, err := strconv.Atoi(parts[2]); err == nil {
 							idx = n - 1
@@ -1333,7 +1182,7 @@ func main() {
 					deleteChapter(idx)
 				} else if sub == "rename" {
 					// Supports 'chapter rename Title' (current) or 'chapter rename 1 Title'
-					idx := currentChapterIndex
+					idx := appState.CurrentChapterIndex()
 					nameStart := 2
 					if len(parts) > 2 {
 						// Check if first arg is a number
@@ -1351,15 +1200,16 @@ func main() {
 	}
 
 	updateInfos := func() {
-		if currentView == ViewAnalyze {
+		view := appState.CurrentView()
+		if view == ViewAnalyze {
 			position.SetText(" Read-Only ")
 			return
 		}
 
 		targetArea := textArea
-		if currentView == ViewNotes {
+		if view == ViewNotes {
 			targetArea = notesArea
-		} else if currentView == ViewWiki {
+		} else if view == ViewWiki {
 			targetArea = wikiArea
 		}
 
@@ -1390,25 +1240,27 @@ func main() {
 				}
 			}
 			if !isModal {
-				if currentView == ViewNotes {
+				switch appState.CurrentView() {
+				case ViewNotes:
 					app.SetFocus(notesArea)
-				} else if currentView == ViewAnalyze {
+				case ViewAnalyze:
 					app.SetFocus(analysisView)
-				} else if currentView == ViewWiki {
+				case ViewWiki:
 					app.SetFocus(wikiArea)
-				} else {
+				default:
 					app.SetFocus(textArea)
 				}
 			}
 		} else if key == tcell.KeyEscape {
 			commandPalette.SetText("")
-			if currentView == ViewNotes {
+			switch appState.CurrentView() {
+			case ViewNotes:
 				app.SetFocus(notesArea)
-			} else if currentView == ViewAnalyze {
+			case ViewAnalyze:
 				app.SetFocus(analysisView)
-			} else if currentView == ViewWiki {
+			case ViewWiki:
 				app.SetFocus(wikiArea)
-			} else {
+			default:
 				app.SetFocus(textArea)
 			}
 		}
@@ -1488,13 +1340,14 @@ Type to enter text.
 			helpPageIndex = 0
 
 			// Restore focus
-			if currentView == ViewNotes {
+			switch appState.CurrentView() {
+			case ViewNotes:
 				app.SetFocus(notesArea)
-			} else if currentView == ViewAnalyze {
+			case ViewAnalyze:
 				app.SetFocus(analysisView)
-			} else if currentView == ViewWiki {
+			case ViewWiki:
 				app.SetFocus(wikiArea)
-			} else {
+			default:
 				app.SetFocus(textArea)
 			}
 			return nil
@@ -1534,7 +1387,7 @@ Type to enter text.
 			return nil
 		}
 		if e.Key() == tcell.KeyCtrlT {
-			isCenteredView = !isCenteredView
+			appState.SetCentered(!appState.Centered())
 			app.ForceDraw()
 			return nil
 		}
@@ -1554,26 +1407,27 @@ Type to enter text.
 		}
 		if e.Key() == tcell.KeyCtrlE {
 			// Auto-exit Focus Mode if user wants to run a command
-			if isFocusMode {
+			if appState.FocusMode() {
 				toggleFocus()
 			}
 			if app.GetFocus() != commandPalette {
 				app.SetFocus(commandPalette)
 			} else {
-				if currentView == ViewNotes {
+				switch appState.CurrentView() {
+				case ViewNotes:
 					app.SetFocus(notesArea)
-				} else if currentView == ViewAnalyze {
+				case ViewAnalyze:
 					app.SetFocus(analysisView)
-				} else if currentView == ViewWiki {
+				case ViewWiki:
 					app.SetFocus(wikiArea)
-				} else {
+				default:
 					app.SetFocus(textArea)
 				}
 			}
 			return nil
 		}
 		if e.Key() == tcell.KeyCtrlS {
-			saveBook(currentFilename, false)
+			saveBook(appState.CurrentFilename(), false)
 			return nil
 		}
 		// Ctrl-N Handler
