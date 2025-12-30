@@ -652,19 +652,6 @@ func main() {
 		}
 	}
 
-	// --- STRUCTURE TEMPLATES ---
-	applyStructure := func(name string) {
-		if err := appState.ApplyStructure(name); err != nil {
-			showModal("Error", err.Error())
-			return
-		}
-		proj := appState.Snapshot()
-		textArea.SetText(proj.Chapters[0].Content, false)
-		notesArea.SetText(proj.Chapters[0].Notes, false)
-		textArea.SetTitle(fmt.Sprintf("gowrite - Chapter 1: %s", proj.Chapters[0].Title))
-		flashStatusMessage("Applied Structure: " + name)
-	}
-
 	// --- WIKI OPS ---
 	deleteWiki := func(index int) {
 		proj := appState.Snapshot()
@@ -942,6 +929,9 @@ func main() {
 				appState.SetFocusMode(false)
 				setView(ViewMain)
 				loadChapter(appState.CurrentChapterIndex())
+			} else if cmd == "structure" {
+				setView(ViewMain)
+				loadChapter(appState.CurrentChapterIndex())
 			}
 
 			if res.Modal {
@@ -1152,13 +1142,6 @@ func main() {
 				}
 			} else {
 				setView(ViewWiki)
-			}
-
-		case "structure":
-			if len(parts) > 1 {
-				applyStructure(parts[1])
-			} else {
-				showModal("Structure", "Usage: structure <name>\nOptions: 3act, hero, cat, fichtean, horror")
 			}
 
 		case "chapter":

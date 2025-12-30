@@ -27,6 +27,7 @@ func init() {
 	Registry["open"] = openHandler
 	Registry["load"] = openHandler
 	Registry["export"] = exportHandler
+	Registry["structure"] = structureHandler
 }
 
 func saveHandler(args []string, st *state.AppState) Result {
@@ -74,4 +75,15 @@ func exportHandler(args []string, st *state.AppState) Result {
 		return Result{Err: err}
 	}
 	return Result{Message: "Exported to " + filename, Modal: true}
+}
+
+func structureHandler(args []string, st *state.AppState) Result {
+	if len(args) == 0 {
+		return Result{Err: errors.New("usage: structure <name>")}
+	}
+	name := strings.TrimSpace(strings.ToLower(args[0]))
+	if err := st.ApplyStructure(name); err != nil {
+		return Result{Err: err}
+	}
+	return Result{Message: "Applied structure: " + name, Modal: true}
 }
