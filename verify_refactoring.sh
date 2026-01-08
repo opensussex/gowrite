@@ -2,9 +2,6 @@
 # Verification script for gowrite refactoring steps
 # This script checks the current state of refactoring and reports progress
 
-set -e
-set +e  # Temporarily disable exit on error for arithmetic operations
-
 echo "🔍 Verifying gowrite refactoring progress..."
 echo ""
 
