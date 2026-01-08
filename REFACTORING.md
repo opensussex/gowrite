@@ -41,7 +41,76 @@ The codebase has already undergone initial refactoring:
 
 ## Refactoring Steps
 
-### Step 1: Extract UI Package ⭐ High Priority
+### Step 3: Extract Analysis Package ⭐ High Priority
+
+**Goal:** Move readability and Hemingway analysis to dedicated package.
+
+**Files to Create:**
+- `analysis/analysis.go` - Analysis functions
+- `analysis/analysis_test.go` - Move existing tests here
+
+**Functions to Move:**
+```go
+// From gowrite.go to analysis/analysis.go
+- CalculateReadability() (already extracted, just move to package)
+- AnalyzeTextForHemingway() (already extracted, just move to package)
+
+// Move tests from gowrite_test.go to analysis/analysis_test.go
+- TestCalculateReadability
+- TestAnalyzeTextForHemingway
+- TestAnalyzeTextForHemingway_MultipleIssues
+- BenchmarkCalculateReadability
+- BenchmarkAnalyzeTextForHemingway
+```
+
+**New Functions to Add:**
+```go
+- CountWords(text string) int - Word counting utility
+- CountSentences(text string) int - Sentence counting utility
+- GetReadingLevel(ari float64) string - Convert ARI to reading level
+```
+
+**Benefits:**
+- All analysis logic in one place
+- Easier to add new analysis types
+- Better organized tests
+- Can be used by other tools
+
+**Estimated Impact:** ~150 lines moved from gowrite.go
+
+---
+
+### Step 4: Extract Spell Check Package
+
+**Goal:** Move spell checking logic to dedicated package.
+
+**Files to Create:**
+- `spellcheck/spellcheck.go` - Spell checking functionality
+- `spellcheck/spellcheck_test.go` - Tests for spell checking
+
+**Functions to Move:**
+```go
+// From gowrite.go to spellcheck/spellcheck.go
+- loadDictionary() → LoadDictionary(path string) (map[string]bool, error)
+- runSpellCheck() → CheckText(text string, dict map[string]bool) []string
+
+// New helper functions
+- IsWord(s string) bool - Check if string is valid word
+- NormalizeWord(s string) string - Clean and normalize word
+- LoadDictionaryOnce() - Singleton pattern for dictionary loading
+```
+
+**Benefits:**
+- Isolated spell checking logic
+- Testable spell checking
+- Can add more sophisticated spell checking
+- Dictionary can be reused across components
+
+**Estimated Impact:** ~70 lines moved from gowrite.go
+
+---
+
+### Step 5: Extract UI Package ⭐ Medium Priority
 
 **Goal:** Separate UI component creation and management from application logic.
 
@@ -72,7 +141,7 @@ The codebase has already undergone initial refactoring:
 
 ---
 
-### Step 2: Extract Modal/Dialog Package
+### Step 6: Extract Modal/Dialog Package
 
 **Goal:** Centralize modal dialog creation and management.
 
@@ -173,7 +242,7 @@ The codebase has already undergone initial refactoring:
 
 ---
 
-### Step 5: Extract View Management Package
+### Step 7: Extract View Management Package
 
 **Goal:** Separate view state management and transitions.
 
@@ -206,7 +275,7 @@ The codebase has already undergone initial refactoring:
 
 ---
 
-### Step 6: Extract Chapter/Wiki Operations
+### Step 8: Extract Chapter/Wiki Operations
 
 **Goal:** Move chapter and wiki UI operations to helper package.
 
@@ -239,7 +308,7 @@ The codebase has already undergone initial refactoring:
 
 ---
 
-### Step 7: Extract Command Handler Extensions
+### Step 9: Extract Command Handler Extensions
 
 **Goal:** Move remaining command logic to commands package.
 
@@ -269,7 +338,7 @@ The codebase has already undergone initial refactoring:
 
 ---
 
-### Step 8: Extract Input Handling
+### Step 10: Extract Input Handling
 
 **Goal:** Centralize keyboard input handling.
 
@@ -349,18 +418,18 @@ Maintain benchmark tests for:
 1. ✅ Extract state package (DONE)
 2. ✅ Extract persistence package (DONE)
 3. ✅ Extract commands package (DONE)
-4. Extract analysis package (Step 4)
-5. Extract spell check package (Step 3)
+4. Extract analysis package (Step 3)
+5. Extract spell check package (Step 4)
 
 ### Phase 2: UI Refactoring (Weeks 3-4)
-1. Extract modal/dialog package (Step 2)
-2. Extract theme management (Step 1)
-3. Extract view management (Step 5)
+1. Extract UI theme management (Step 5)
+2. Extract modal/dialog package (Step 6)
+3. Extract view management (Step 7)
 
 ### Phase 3: Advanced Refactoring (Weeks 5-6)
-1. Extract chapter/wiki operations (Step 6)
-2. Extract input handling (Step 8)
-3. Complete command handler extraction (Step 7)
+1. Extract chapter/wiki operations (Step 8)
+2. Complete command handler extraction (Step 9)
+3. Extract input handling (Step 10)
 
 ### Phase 4: Polish and Optimization (Week 7)
 1. Add comprehensive tests
@@ -395,7 +464,7 @@ Maintain benchmark tests for:
 
 ## Quick Start Guide
 
-To begin refactoring, start with Step 4 (Extract Analysis Package) as it's the lowest risk:
+To begin refactoring, start with Step 3 (Extract Analysis Package) as it's the lowest risk:
 
 ```bash
 # 1. Create the analysis package

@@ -176,7 +176,11 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # Calculate progress percentage
-PROGRESS=$((COMPLETED_STEPS * 100 / TOTAL_STEPS))
+if [ "$TOTAL_STEPS" -gt 0 ]; then
+    PROGRESS=$((COMPLETED_STEPS * 100 / TOTAL_STEPS))
+else
+    PROGRESS=0
+fi
 
 echo "Refactoring Progress: $COMPLETED_STEPS/$TOTAL_STEPS steps completed ($PROGRESS%)"
 echo ""
