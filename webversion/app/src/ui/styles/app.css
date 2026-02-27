@@ -1,0 +1,30 @@
+:root {
+  --tui-bg-0: #040705;
+  --tui-bg-1: #08110b;
+  --tui-bg-2: #0b1710;
+  --tui-fg-main: #c9ffd9;
+  --tui-fg-soft: #7fd89a;
+  --tui-fg-dim: #4f8e63;
+  --tui-accent: #7dffa8;
+  --tui-warning: #ffe67d;
+  --tui-border: #2a6640;
+  --tui-border-strong: #4db877;
+  --tui-font: "IBM Plex Mono", "JetBrains Mono", "Fira Code", "Menlo", "Consolas", monospace;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  color: var(--tui-fg-main);
+  background:
+    linear-gradient(180deg, rgb(4 7 5 / 94%) 0%, rgb(6 11 8 / 96%) 100%),
+    repeating-linear-gradient(0deg, rgb(125 255 168 / 2%) 0px, rgb(125 255 168 / 2%) 1px, transparent 1px, transparent 3px),
+    radial-gradient(circle at 10% 10%, rgb(125 255 168 / 10%) 0%, transparent 40%);
+  font-family: var(--tui-font);
+}
+
+* {
+  box-sizing: border-box;
+}
