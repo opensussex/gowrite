@@ -19,7 +19,7 @@ test("chapter lifecycle via command palette", async ({ page }) => {
 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await page.getByRole("button", { name: "OK" }).click();
+  await page.getByRole("button", { name: "Yes" }).click();
 
   await expect(page.getByText(/CHAPTER 1\/1/)).toBeVisible();
 });

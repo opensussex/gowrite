@@ -16,6 +16,7 @@ export interface CommandContext {
   persistCurrentProject(force?: boolean): void;
   showModal(title: string, message: string): Promise<void>;
   confirm(title: string, message: string): Promise<boolean>;
+  selectFromList(title: string, items: string[], initialIndex?: number): Promise<number | null>;
 }
 
 export type CommandHandler = (

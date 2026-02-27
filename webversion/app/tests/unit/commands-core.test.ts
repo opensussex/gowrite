@@ -32,6 +32,7 @@ function createHarness() {
     return;
   });
   const confirmSpy = vi.fn(async () => true);
+  const selectFromListSpy = vi.fn(async (_title: string, _items: string[], initialIndex = 0) => initialIndex);
 
   const context: CommandContext = {
     getState: () => store.getState(),
@@ -47,10 +48,11 @@ function createHarness() {
       store.dispatch({ type: "SAVE_SUCCEEDED", timestamp: 1700000000000 });
     },
     showModal: modalSpy,
-    confirm: confirmSpy
+    confirm: confirmSpy,
+    selectFromList: selectFromListSpy
   };
 
-  return { store, repo, bus, context, modalSpy, confirmSpy };
+  return { store, repo, bus, context, modalSpy, confirmSpy, selectFromListSpy };
 }
 
 describe("core commands", () => {
@@ -156,5 +158,19 @@ describe("core commands", () => {
     expect(confirmSpy).toHaveBeenCalled();
     expect(store.getState().project.chapters.length).toBeGreaterThan(beforeCount);
     expect(store.getState().project.chapters[0].title).toContain("Act");
+  });
+
+  it("opens chapters selector and sets current chapter", async () => {
+    const { bus, context, store, selectFromListSpy } = createHarness();
+
+    await bus.execute('chapter new "Act One"', context);
+    await bus.execute('chapter new "Act Two"', context);
+
+    selectFromListSpy.mockResolvedValueOnce(0);
+    const result = await bus.execute("chapters", context);
+
+    expect(result.ok).toBe(true);
+    expect(selectFromListSpy).toHaveBeenCalled();
+    expect(store.getState().project.chapters[0].id).toBe(store.getState().currentChapterId);
   });
 });

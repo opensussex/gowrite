@@ -8,6 +8,7 @@ describe("help registry", () => {
     expect(ids).toContain("save");
     expect(ids).toContain("open");
     expect(ids).toContain("chapter");
+    expect(ids).toContain("chapters");
     expect(ids).toContain("notes");
     expect(ids).toContain("wiki");
     expect(ids).toContain("structure");
@@ -35,6 +36,11 @@ describe("help registry", () => {
   it("resolves aliases", () => {
     const topic = resolveHelpTopic("load");
     expect(topic?.id).toBe("open");
+  });
+
+  it("resolves chapter list alias", () => {
+    const topic = resolveHelpTopic("list");
+    expect(topic?.id).toBe("chapters");
   });
 
   it("renders structure topic details", () => {

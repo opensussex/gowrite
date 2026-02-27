@@ -157,6 +157,36 @@ async function handleChapter(context: CommandContext, args: string[]): Promise<C
   return { ok: false, error: `Unknown chapter subcommand '${sub}'` };
 }
 
+async function handleChapters(context: CommandContext): Promise<CommandResult> {
+  const state = context.getState();
+  const items = state.project.chapters.map((chapter, index) => {
+    const current = chapter.id === state.currentChapterId ? " (current)" : "";
+    return `${index + 1}. ${chapter.title}${current}`;
+  });
+  const currentIndex = state.project.chapters.findIndex((chapter) => chapter.id === state.currentChapterId);
+
+  const selectedIndex = await context.selectFromList(
+    "Chapters",
+    items,
+    currentIndex >= 0 ? currentIndex : 0
+  );
+
+  if (selectedIndex === null) {
+    return { ok: true, message: "Chapter selection canceled" };
+  }
+
+  const selectedChapter = getChapterByIndex(context.getState(), selectedIndex);
+  if (!selectedChapter) {
+    return { ok: false, error: "Selected chapter is out of range" };
+  }
+
+  context.dispatch({ type: "SET_CURRENT_CHAPTER", chapterId: selectedChapter.id });
+  return {
+    ok: true,
+    message: `Selected chapter ${selectedIndex + 1}: ${selectedChapter.title}`
+  };
+}
+
 async function handleWordCount(context: CommandContext): Promise<CommandResult> {
   const state = context.getState();
   if (state.view === "wiki") {
@@ -314,6 +344,7 @@ export function registerCoreCommands(bus: CommandBus): void {
   bus.register("save", handleSave);
   bus.register("open", handleOpen, ["load"]);
   bus.register("chapter", handleChapter);
+  bus.register("chapters", handleChapters, ["list"]);
   bus.register("notes", handleNotes);
   bus.register("wiki", handleWiki);
   bus.register("structure", handleStructure);

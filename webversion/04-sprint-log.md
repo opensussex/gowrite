@@ -94,6 +94,7 @@ This file tracks completed sprints and what was shipped at the end of each sprin
   - `wiki new`
   - `wiki rename`
   - `wiki delete`
+  - `chapters` (modal chapter picker with Up/Down/Enter/Esc)
   - `structure <name>`
 - Shortcut expansion shipped:
   - `Ctrl/Cmd+N` toggle notes view

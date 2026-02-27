@@ -40,7 +40,7 @@ test("wiki command lifecycle", async ({ page }) => {
 
   await runCommand(page, "wiki delete 2");
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: "OK" }).click();
+  await page.getByRole("button", { name: "Yes" }).click();
   await expect(page.getByRole("button", { name: "World Lore" })).toHaveCount(0);
 });
 
@@ -49,8 +49,24 @@ test("structure command applies chapter template", async ({ page }) => {
 
   await runCommand(page, "structure hero");
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: "OK" }).click();
+  await page.getByRole("button", { name: "Yes" }).click();
 
   await expect(page.getByText(/CHAPTER\s+1\/[2-9]/)).toBeVisible();
   await expect(page.getByText(/CHAPTER\s+:\s+ORDINARY WORLD/i)).toBeVisible();
+});
+
+test("chapters command opens modal list and supports arrow selection", async ({ page }) => {
+  await page.goto("/");
+
+  await runCommand(page, 'chapter new "Act One"');
+  await runCommand(page, 'chapter new "Act Two"');
+  await expect(page.getByText(/CHAPTER\s+3\/3/)).toBeVisible();
+
+  await runCommand(page, "chapters");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByText(/CHAPTER\s+2\/3/)).toBeVisible();
+  await expect(page.getByText(/CHAPTER\s+:\s+ACT ONE/i)).toBeVisible();
 });

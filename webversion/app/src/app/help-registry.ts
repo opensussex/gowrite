@@ -20,7 +20,7 @@ const HELP_TOPICS: HelpTopic[] = [
     details: [
       "Use 'help' with no args to see all commands/features.",
       "Use 'help <topic>' for detailed usage and examples.",
-      "Topics include commands and features such as: save, open, chapter, notes, wiki, structure, wordcount, autosave, typewriter."
+      "Topics include commands and features such as: save, open, chapter, chapters, notes, wiki, structure, wordcount, autosave, typewriter."
     ],
     examples: ["help chapter", "help open", "help autosave"]
   },
@@ -75,6 +75,20 @@ const HELP_TOPICS: HelpTopic[] = [
       "chapter rename 2 \"Inciting Incident\"",
       "chapter delete 3"
     ]
+  },
+  {
+    id: "chapters",
+    title: "chapters",
+    aliases: ["list"],
+    type: "command",
+    summary: "Open chapter picker modal and jump to a chapter using keyboard.",
+    usage: ["chapters"],
+    details: [
+      "Opens a modal list of chapters.",
+      "Use Up/Down arrow keys to move selection.",
+      "Press Enter to select chapter, Esc to cancel."
+    ],
+    examples: ["chapters"]
   },
   {
     id: "notes",

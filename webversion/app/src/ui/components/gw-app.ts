@@ -336,7 +336,9 @@ export class GwApp extends HTMLElement {
       repo: this.repo,
       persistCurrentProject: (force = false) => this.persistCurrentProject(force),
       showModal: async (title, message) => this.getModal().showInfo(title, message),
-      confirm: async (title, message) => this.getModal().confirm(title, message)
+      confirm: async (title, message) => this.getModal().confirm(title, message),
+      selectFromList: async (title, items, initialIndex = 0) =>
+        this.getModal().selectFromList(title, items, initialIndex)
     };
   }
 
