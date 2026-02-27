@@ -4,6 +4,7 @@
 - Architecture style: modular TypeScript + Web Components only.
 - No backend calls.
 - Every task includes tests unless explicitly marked `Spike`.
+- Every feature or command change must include a help-system update (command reference, behavior notes, or usage examples).
 - Merge criteria: lint, unit tests, and relevant e2e tests pass.
 
 ## Definition of Done
@@ -12,6 +13,7 @@
 - State survives refresh via `localStorage`.
 - Keyboard interactions are accessible and documented.
 - Unit and/or e2e coverage added for changed behavior.
+- Help content is updated for every new user-visible feature and command behavior change.
 
 ## Priority Backlog
 
@@ -49,12 +51,13 @@
 | WEB-030 | P0 | Testing | Add Playwright e2e for chapter/wiki lifecycle + autosave recovery | WEB-027, WEB-028 | L | End-to-end suite verifies authoring, reload persistence, command flows |
 | WEB-031 | P1 | UX | Implement theme system (`dark`, `light`, `retro`) with CSS tokens | WEB-013 | M | Theme command updates tokens and persists selected theme |
 | WEB-032 | P1 | UX | Implement centered mode and focus mode layout toggles | WEB-014, WEB-015 | M | Modes visually match intent and persist in settings |
-| WEB-033 | P1 | Commands | Port `search`, `help`, chapter list modal parity | WEB-021 | M | Commands available and covered by tests |
+| WEB-033 | P1 | Commands | Port `search` and chapter list modal parity | WEB-021 | M | Commands available and covered by tests |
 | WEB-034 | P1 | Commands | Evaluate and implement chapter reorder command parity | WEB-020 | S | Either implemented with tests or explicitly removed/documented |
 | WEB-035 | P1 | Docs | Add user docs for browser usage, shortcuts, import/export | WEB-030 | S | `webversion/docs` includes usage and troubleshooting |
 | WEB-036 | P1 | Release | Package as static app and document deployment options (GitHub Pages/Netlify) | WEB-030 | S | Deployment guide tested on one hosted environment |
 | WEB-037 | P2 | Quality | Add performance budget and typing latency benchmark | WEB-014 | S | Typing remains responsive for large chapter text |
 | WEB-038 | P2 | Quality | Add corruption recovery UX for invalid localStorage payloads | WEB-011 | S | App can recover/reset gracefully with user confirmation |
+| WEB-039 | P0 | UX/Docs | Implement in-app `help` command and structured help registry used by all features | WEB-021, WEB-019 | M | `help` command available from Sprint 3 onward and every shipped feature has corresponding help entry |
 
 ## Command Parity Checklist
 
@@ -72,7 +75,7 @@
 | `wordcount` | P0 | WEB-020 |
 | `import` / `import new` | P0 | WEB-026 |
 | `search` | P1 | WEB-033 |
-| `help` | P1 | WEB-033 |
+| `help` | P0 | WEB-039 |
 | `theme` | P1 | WEB-031 |
 
 ## Execution Order (Updated)
@@ -85,7 +88,7 @@
 |---|---|---|
 | Sprint 1 | Writing MVP | WEB-001, WEB-002, WEB-003, WEB-004, WEB-008, WEB-009, WEB-010, WEB-012, WEB-013, WEB-014, WEB-017, WEB-027, WEB-029A, WEB-030A |
 | Sprint 2 | Project + Chapter Management | WEB-011, WEB-018, WEB-019, WEB-020A, WEB-021, WEB-028, WEB-029B, WEB-030B |
-| Sprint 3 | Notes + Wiki + Templates | WEB-015, WEB-016, WEB-005, WEB-020B, WEB-027 (expanded), WEB-029C, WEB-030C |
+| Sprint 3 | Notes + Wiki + Templates | WEB-015, WEB-016, WEB-005, WEB-020B, WEB-027 (expanded), WEB-039, WEB-029C, WEB-030C |
 | Sprint 4 | Analysis + Spellcheck | WEB-006, WEB-007, WEB-022, WEB-023, WEB-024, WEB-020C, WEB-029C, WEB-030D |
 | Sprint 5 | Import/Export + Secondary Commands | WEB-025, WEB-026, WEB-033, WEB-034, WEB-020D, WEB-020E, WEB-029D, WEB-030E |
 | Sprint 6 | Polish + Release | WEB-031, WEB-032, WEB-035, WEB-036, WEB-037, WEB-038 |
@@ -98,7 +101,7 @@
 | WEB-020B | WEB-020 | Sprint 3 | Implement planning command handlers: `wiki new/delete/rename`, `notes`, `structure <name>` | WEB-020A, WEB-015, WEB-016, WEB-005 | M | Commands mutate wiki/view/template state correctly and preserve focus behavior |
 | WEB-020C | WEB-020 | Sprint 4 | Implement `analyze` command integration to open analysis view with current text | WEB-022, WEB-020A | S | `analyze` switches view, renders metrics, and returns to editing mode cleanly |
 | WEB-020D | WEB-020 | Sprint 5 | Implement command integration for import/export workflows (`export`, `import`, `import new`) | WEB-025, WEB-026, WEB-020A | M | File commands trigger browser file APIs and user-visible completion/error messages |
-| WEB-020E | WEB-020 | Sprint 5 | Implement secondary commands: `search`, `help`, chapter list modal entry points | WEB-033, WEB-020A | S | Secondary commands are discoverable in palette and behave consistently with docs |
+| WEB-020E | WEB-020 | Sprint 5 | Implement secondary commands: `search` and chapter list modal entry points | WEB-033, WEB-020A | S | Secondary commands are discoverable in palette and have matching help entries |
 | WEB-020F | WEB-020 | Sprint 6 | Command parity cleanup and deprecation handling for any intentionally unsupported commands | WEB-020A, WEB-020B, WEB-020C, WEB-020D, WEB-020E | S | Command catalog documented, unsupported commands return actionable guidance, all command tests pass |
 
 ## Child Tasks: WEB-029 (Unit/Integration Testing)

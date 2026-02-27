@@ -1,5 +1,5 @@
 import type { AppState } from "@/domain/models";
-import { getCurrentChapter, getWordCount } from "@/app/selectors";
+import { getCurrentChapter, getCurrentWikiEntry, getWordCount } from "@/app/selectors";
 
 export class GwStatusBar extends HTMLElement {
   private readonly root = this.attachShadow({ mode: "open" });
@@ -50,7 +50,14 @@ export class GwStatusBar extends HTMLElement {
     }
 
     const chapter = getCurrentChapter(state);
-    const text = chapter?.content ?? "";
+    const wikiEntry = getCurrentWikiEntry(state);
+    let text = chapter?.content ?? "";
+    if (state.view === "notes") {
+      text = chapter?.notes ?? "";
+    }
+    if (state.view === "wiki") {
+      text = wikiEntry?.content ?? "";
+    }
     const words = getWordCount(text);
     const saveState = state.dirty ? "DIRTY" : "CLEAN";
     const saveClass = state.dirty ? "segment state-dirty" : "segment";
@@ -58,6 +65,7 @@ export class GwStatusBar extends HTMLElement {
 
     bar.innerHTML = `
       <span class="segment"><strong>WORDS</strong> ${words}</span>
+      <span class="segment"><strong>VIEW</strong> ${state.view.toUpperCase()}</span>
       <span class="segment"><strong>ROW</strong> ${state.cursor.row}</span>
       <span class="segment"><strong>COL</strong> ${state.cursor.column}</span>
       <span class="segment"><strong>TYPEWRITER</strong> ${typewriterState}</span>

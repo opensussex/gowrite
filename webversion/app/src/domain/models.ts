@@ -42,6 +42,7 @@ export interface AppState {
   settings: AppSettings;
   view: ViewMode;
   currentChapterId: string;
+  currentWikiId: string;
   dirty: boolean;
   lastSavedAt: number | null;
   cursor: CursorPosition;

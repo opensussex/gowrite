@@ -1,4 +1,5 @@
 import type { AppSettings, Project } from "@/domain/models";
+import { migrateProject, migrateSettings } from "./migrations";
 
 const SETTINGS_KEY = "gowrite.settings";
 const CURRENT_PROJECT_KEY = "gowrite.currentProjectId";
@@ -7,6 +8,12 @@ const PROJECT_KEY_PREFIX = "gowrite.project.";
 
 interface ProjectIndex {
   ids: string[];
+}
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  updatedAt: string;
 }
 
 export interface StorageLike {
@@ -33,8 +40,15 @@ export class LocalStorageRepository {
     this.storage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }
 
-  loadSettings(): AppSettings | null {
-    return parseJson<AppSettings>(this.storage.getItem(SETTINGS_KEY));
+  loadSettings(fallback?: AppSettings): AppSettings | null {
+    const raw = parseJson<unknown>(this.storage.getItem(SETTINGS_KEY));
+    if (!fallback) {
+      return raw as AppSettings | null;
+    }
+    if (raw === null) {
+      return fallback;
+    }
+    return migrateSettings(raw, fallback);
   }
 
   saveProject(project: Project): void {
@@ -49,6 +63,10 @@ export class LocalStorageRepository {
     }
   }
 
+  setCurrentProjectId(projectId: string): void {
+    this.storage.setItem(CURRENT_PROJECT_KEY, projectId);
+  }
+
   loadCurrentProject(): Project | null {
     const currentProjectId = this.storage.getItem(CURRENT_PROJECT_KEY);
     if (!currentProjectId) {
@@ -59,10 +77,64 @@ export class LocalStorageRepository {
 
   loadProject(projectId: string): Project | null {
     const key = `${PROJECT_KEY_PREFIX}${projectId}`;
-    return parseJson<Project>(this.storage.getItem(key));
+    const raw = parseJson<unknown>(this.storage.getItem(key));
+    if (raw === null) {
+      return null;
+    }
+    return migrateProject(raw);
   }
 
   loadProjectIndex(): ProjectIndex {
-    return parseJson<ProjectIndex>(this.storage.getItem(PROJECT_INDEX_KEY)) ?? { ids: [] };
+    const raw = parseJson<ProjectIndex>(this.storage.getItem(PROJECT_INDEX_KEY));
+    if (!raw || !Array.isArray(raw.ids)) {
+      return { ids: [] };
+    }
+
+    const ids = raw.ids.filter((id) => typeof id === "string" && id.trim().length > 0);
+    return { ids };
+  }
+
+  listProjects(): ProjectSummary[] {
+    const summaries: ProjectSummary[] = [];
+    const index = this.loadProjectIndex();
+
+    index.ids.forEach((id) => {
+      const project = this.loadProject(id);
+      if (!project) {
+        return;
+      }
+      summaries.push({
+        id: project.id,
+        name: project.name,
+        updatedAt: project.updatedAt
+      });
+    });
+
+    return summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  findProject(query: string): Project | null {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+
+    const direct = this.loadProject(query.trim());
+    if (direct) {
+      return direct;
+    }
+
+    const summaries = this.listProjects();
+    const exact = summaries.find((summary) => summary.name.toLowerCase() === normalized);
+    if (exact) {
+      return this.loadProject(exact.id);
+    }
+
+    const fuzzy = summaries.find((summary) => summary.name.toLowerCase().includes(normalized));
+    if (fuzzy) {
+      return this.loadProject(fuzzy.id);
+    }
+
+    return null;
   }
 }

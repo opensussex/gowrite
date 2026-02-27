@@ -23,7 +23,8 @@ export default [
         window: "readonly",
         document: "readonly",
         customElements: "readonly",
-        HTMLElement: "readonly"
+        HTMLElement: "readonly",
+        CustomEvent: "readonly"
       }
     },
     plugins: {

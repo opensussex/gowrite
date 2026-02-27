@@ -9,7 +9,8 @@
 - Every sprint must include:
   - at least one end-user visible capability,
   - persistence and basic test coverage for new behavior,
-  - a deployable static build.
+  - a deployable static build,
+  - help coverage updates for any new feature or command in that sprint.
 
 ## Sprint 1: Writing MVP Release
 User value:
@@ -56,12 +57,14 @@ Exit criteria:
 ## Sprint 3: Story Planning Release (Notes + Wiki + Templates)
 User value:
 - A writer can plan scenes and world-building directly in the app.
+- A writer can discover available features through in-app help.
 
 Backlog items:
 - WEB-015
 - WEB-016
 - WEB-005
 - WEB-020 (subset: `wiki new/delete/rename`, `notes`, `structure`)
+- WEB-039 (`help` command + help registry baseline)
 - WEB-027 (expand shortcuts for notes/wiki flows)
 - WEB-029 (add wiki/template unit coverage)
 - WEB-030 (add notes/wiki lifecycle coverage)
@@ -69,6 +72,7 @@ Backlog items:
 Exit criteria:
 - Notes and wiki are fully usable and persisted.
 - Structure templates can be applied from command palette.
+- `help` command is available and includes Sprint 1-3 feature coverage.
 
 ## Sprint 4: Editing Intelligence Release
 User value:
@@ -102,7 +106,7 @@ Backlog items:
 
 Exit criteria:
 - JSON and TXT import/export are production-ready.
-- Secondary commands (`search`, `help`, chapter list/reorder decision) shipped.
+- Secondary commands (`search`, chapter list/reorder decision) shipped.
 
 ## Sprint 6: Polish and Public Release
 User value:
@@ -120,4 +124,3 @@ Exit criteria:
 - Theme + layout polish complete.
 - Deployment docs complete and validated.
 - Recovery paths and performance checks in place.
-
