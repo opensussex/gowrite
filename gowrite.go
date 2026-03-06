@@ -925,6 +925,9 @@ func main() {
 			}
 
 			if cmd == "open" || cmd == "load" {
+				appState.SetLoading(true)
+				defer appState.SetLoading(false)
+
 				appState.SetView(ViewMain)
 				appState.SetFocusMode(false)
 				setView(ViewMain)
