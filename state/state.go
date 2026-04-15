@@ -411,3 +411,22 @@ func (s *AppState) DeleteWiki(idx int) (int, error) {
 	}
 	return s.CurrentWikiIdx, nil
 }
+
+func (s *AppState) WordGoal(chapterIdx int) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if chapterIdx < 0 || chapterIdx >= len(s.Project.Chapters) {
+		return 0, errors.New("chapter index out of range")
+	}
+	return s.Project.Chapters[chapterIdx].Target, nil
+}
+
+func (s *AppState) SetWordGoal(chapterIdx int, target int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if chapterIdx < 0 || chapterIdx >= len(s.Project.Chapters) {
+		return errors.New("chapter index out of range")
+	}
+	s.Project.Chapters[chapterIdx].Target = target
+	return nil
+}

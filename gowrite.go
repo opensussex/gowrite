@@ -975,6 +975,27 @@ func main() {
 			}
 		case "spellcheck", "spell":
 			runSpellCheck()
+		case "goal":
+			idx := appState.CurrentChapterIndex()
+			if len(parts) > 1 {
+				target, err := strconv.Atoi(parts[1])
+				if err != nil || target < 0 {
+					showModal("Error", "Usage: goal <number>\nSet word target for current chapter.")
+					break
+				}
+				if err := appState.SetWordGoal(idx, target); err != nil {
+					showModal("Error", err.Error())
+					break
+				}
+				showModal("Goal Set", fmt.Sprintf("Word goal for '%s' set to %d", appState.Snapshot().Chapters[idx].Title, target))
+			} else {
+				current, _ := appState.WordGoal(idx)
+				if current > 0 {
+					showModal("Word Goal", fmt.Sprintf("Current chapter word goal: %d", current))
+				} else {
+					showModal("Word Goal", "No word goal set for this chapter.\nUsage: goal <number>")
+				}
+			}
 		case "theme":
 			if len(parts) > 1 {
 				applyTheme(parts[1])
@@ -1163,7 +1184,24 @@ func main() {
 		wordCount := len(strings.Fields(text))
 
 		wordCountStr := fmt.Sprintf("[%s]%d[white]", tview.Styles.SecondaryTextColor, wordCount)
-		position.SetText(fmt.Sprintf("Words: %s | Row: %d Col: %d ", wordCountStr, fromRow, fromColumn))
+
+		goalStr := ""
+		chapterIdx := appState.CurrentChapterIndex()
+		if goal, err := appState.WordGoal(chapterIdx); err == nil && goal > 0 {
+			progress := float64(wordCount) / float64(goal) * 100
+			if progress > 100 {
+				progress = 100
+			}
+			bars := int(progress / 5)
+			barStr := strings.Repeat("█", bars) + strings.Repeat("░", 20-bars)
+			color := "[green]"
+			if progress >= 100 {
+				color = "[yellow]"
+			}
+			goalStr = fmt.Sprintf(" [%s]%s[white] %d/%d ", color, barStr, wordCount, goal)
+		}
+
+		position.SetText(fmt.Sprintf("Words: %s%s| Row: %d Col: %d ", wordCountStr, goalStr, fromRow, fromColumn))
 	}
 	textArea.SetMovedFunc(updateInfos)
 	notesArea.SetMovedFunc(updateInfos)
@@ -1178,7 +1216,7 @@ func main() {
 
 			// Intelligent focus restoration
 			isModal := false
-			for _, m := range []string{"help", "chapters", "list", "wordcount", "save", "open", "load", "export", "search", "replace", "spell", "theme", "analyze", "target", "chapter", "wiki", "structure", "import"} {
+			for _, m := range []string{"help", "chapters", "list", "wordcount", "save", "open", "load", "export", "search", "replace", "spell", "theme", "analyze", "goal", "chapter", "wiki", "structure", "import"} {
 				if strings.HasPrefix(cmd, m) {
 					isModal = true
 					break
@@ -1264,6 +1302,7 @@ Type to enter text.
 [yellow]export <file>[white]: Export to text
 [yellow]notes[white] (or Ctrl-N): Toggle Notes
 [yellow]analyze[white]: Hemingway Analysis Mode
+[yellow]goal <number>[white]: Set word goal for current chapter
 [yellow]chapter new/delete/rename[white]: Manage chapters
 [yellow]import <file.txt>[white]: Import .txt into current chapter
 [yellow]import new <file.txt>[white]: Import .txt into a new chapter`)
