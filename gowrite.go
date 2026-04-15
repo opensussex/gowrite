@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode"
 
+	"gowrite/browser"
 	"gowrite/commands"
 	"gowrite/persistence"
 	"gowrite/state"
@@ -835,67 +836,25 @@ func main() {
 
 	// --- FILE PICKER ---
 	showFilePicker := func() {
-		// Get list of .json files in current directory
-		files, err := os.ReadDir(".")
-		if err != nil {
-			showModal("Error", "Could not read directory")
-			return
-		}
-
-		var jsonFiles []string
-		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
-				jsonFiles = append(jsonFiles, file.Name())
+		focusRestore := func() {
+			switch appState.CurrentView() {
+			case ViewNotes:
+				app.SetFocus(notesArea)
+			case ViewWiki:
+				app.SetFocus(wikiArea)
+			default:
+				app.SetFocus(textArea)
 			}
 		}
 
-		if len(jsonFiles) == 0 {
-			showModal("No Files", "No .json files found in current directory.\nUsage: open <filename>")
-			return
-		}
-
-		// Create file picker list
-		fileList := tview.NewList()
-		fileList.ShowSecondaryText(false)
-		fileList.SetHighlightFullLine(true)
-		fileList.SetSelectedBackgroundColor(tview.Styles.TitleColor)
-		fileList.SetSelectedTextColor(tview.Styles.PrimitiveBackgroundColor)
-		fileList.SetBorder(true)
-		fileList.SetTitle("Open file (↑↓ to navigate)")
-		fileList.SetBorderPadding(1, 1, 2, 2)
-
-		// Add files to list
-		for _, filename := range jsonFiles {
-			fname := filename // Capture for closure
-			fileList.AddItem(fname, "", 0, func() {
-				pages.HidePage("filepicker")
-				loadBook(fname)
-			})
-		}
-
-		// Handle escape key
-		fileList.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-			if event.Key() == tcell.KeyEscape {
-				pages.HidePage("filepicker")
-				switch appState.CurrentView() {
-				case ViewNotes:
-					app.SetFocus(notesArea)
-				case ViewWiki:
-					app.SetFocus(wikiArea)
-				default:
-					app.SetFocus(textArea)
-				}
-				return nil
-			}
-			return event
+		b := browser.New("", func(path string) {
+			loadBook(path)
+		}, func() {
+			pages.RemovePage("browser")
+			focusRestore()
 		})
 
-		// Show the file picker
-		pages.AddPage("filepicker", tview.NewGrid().
-			SetColumns(0, 60, 0).
-			SetRows(0, 20, 0).
-			AddItem(fileList, 1, 1, 1, 1, 0, 0, true), true, true)
-		app.SetFocus(fileList)
+		b.Show(app, pages)
 	}
 
 	// --- COMMAND PROCESSING ---
